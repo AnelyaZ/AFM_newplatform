@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(npm install:*)",
+      "Bash(npm audit:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npx tsc --noEmit --skipLibCheck)",
+      "Bash(npm ls:*)",
+      "Bash(node:*)",
+      "Bash(dir:*)",
+      "Bash(echo:*)",
+      "Bash(tar:*)"
+    ]
+  }
+}

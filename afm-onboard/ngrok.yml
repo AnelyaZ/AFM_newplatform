@@ -1,0 +1,17 @@
+version: "3"
+
+# ВНИМАНИЕ: не указывайте здесь свой authtoken. Добавьте его в пользовательский конфиг
+# через команду `ngrok config add-authtoken <TOKEN>` или используйте переменную окружения.
+
+tunnels:
+  frontend:
+    addr: 5173
+    proto: http
+  backend:
+    addr: 8080
+    proto: http
+
+
+
+
+

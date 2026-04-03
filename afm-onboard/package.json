@@ -1,0 +1,37 @@
+{
+  "name": "afm-onboard",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:infra": "docker compose up -d db minio",
+    "dev:waitdb": "wait-on tcp:localhost:5432",
+    "dev:prepare": "npm-run-all -l dev:infra dev:waitdb db:migrate db:seed",
+    "dev:backend": "npm run start:dev -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "dev:apps": "npm-run-all -p dev:backend dev:frontend",
+    "dev": "npm-run-all -p dev:backend dev:frontend",
+    "dev:docker": "npm-run-all -l dev:prepare dev:apps",
+    "db:migrate": "npm run prisma:migrate -w backend",
+    "db:seed": "npm run prisma:seed -w backend",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "ngrok:start": "npm-run-all -p ngrok:frontend ngrok:backend",
+    "ngrok:frontend": "ngrok http 5173",
+    "ngrok:backend": "ngrok http 8080",
+    "share": "npm run build && npm-run-all -p ngrok:frontend ngrok:backend"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5",
+    "wait-on": "^7.2.0"
+  },
+  "dependencies": {
+    "lucide-react": "^0.539.0",
+    "@nestjs/common": "^11.0.1",
+    "@nestjs/core": "^11.0.1",
+    "@nestjs/platform-express": "^11.0.1",
+    "class-validator": "^0.14.2",
+    "class-transformer": "^0.5.1"
+  }
+}

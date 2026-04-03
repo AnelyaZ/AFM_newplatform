@@ -1,0 +1,361 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  engineType = "wasm"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserRole {
+  EMPLOYEE
+  ADMIN
+}
+
+enum UserStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BlockType {
+  TEXT
+  IMAGE
+  VIDEO
+  FILE
+}
+
+enum QuestionType {
+  SINGLE
+  MULTI
+  BOOLEAN
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  PASSED
+  FAILED
+}
+
+enum ProgressStatus {
+  LOCKED
+  AVAILABLE
+  COMPLETED
+}
+
+// Models
+model User {
+  id                 String     @id @default(uuid()) @db.Uuid
+  fullName           String
+  position           String
+  birthDate          DateTime   @db.Date
+  email              String     @unique @db.Citext
+  passwordHash       String
+  role               UserRole   @default(EMPLOYEE)
+  status             UserStatus @default(PENDING)
+  mustChangePassword Boolean    @default(false)
+  avatarKey          String?
+  createdAt          DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime   @default(now()) @updatedAt @db.Timestamptz(6)
+
+  // Relations
+  createdChapters  Chapter[]          @relation("ChapterCreatedBy")
+  updatedChapters  Chapter[]          @relation("ChapterUpdatedBy")
+  createdCourses   Course[]           @relation("CourseCreatedBy")
+  updatedCourses   Course[]           @relation("CourseUpdatedBy")
+  attempts         TestAttempt[]
+  sessions         Session[]
+  auditLogs        AuditLog[]         @relation("AuditActor")
+  progress         UserProgress[]
+  lessonProgresses LessonProgress[]
+  adminInvites     AdminInvite[]      @relation("AdminInvitedBy")
+  courseAccesses   UserCourseAccess[] @relation("CourseAccessUser")
+}
+
+model AdminInvite {
+  id               String    @id @default(uuid()) @db.Uuid
+  email            String    @unique @db.Citext
+  tempPasswordHash String
+  invitedById      String    @db.Uuid
+  invitedBy        User      @relation("AdminInvitedBy", fields: [invitedById], references: [id])
+  expiresAt        DateTime  @db.Timestamptz(6)
+  usedAt           DateTime? @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+}
+
+model Session {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @db.Uuid
+  user             User     @relation(fields: [userId], references: [id])
+  refreshTokenHash String
+  ip               String?  @db.Inet
+  ua               String?
+  expiresAt        DateTime @db.Timestamptz(6)
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model Chapter {
+  id          String   @id @default(uuid()) @db.Uuid
+  courseId    String?  @db.Uuid
+  course      Course?  @relation(fields: [courseId], references: [id])
+  orderIndex  Int
+  title       String
+  description String?
+  passScore   Int
+  isPublished Boolean  @default(false)
+  createdById String   @db.Uuid
+  updatedById String   @db.Uuid
+  createdBy   User     @relation("ChapterCreatedBy", fields: [createdById], references: [id])
+  updatedBy   User     @relation("ChapterUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  contents   ChapterContent[]
+  lessons    Lesson[]
+  test       Test?
+  progresses UserProgress[]
+
+  @@unique([courseId, orderIndex])
+}
+
+model ChapterContent {
+  id        String    @id @default(uuid()) @db.Uuid
+  chapterId String    @db.Uuid
+  chapter   Chapter   @relation(fields: [chapterId], references: [id])
+  blockType BlockType
+  textHtml  String?
+  mediaKey  String?
+  sortIndex Int
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
+model Lesson {
+  id          String   @id @default(uuid()) @db.Uuid
+  chapterId   String   @db.Uuid
+  chapter     Chapter  @relation(fields: [chapterId], references: [id])
+  orderIndex  Int
+  title       String
+  description String?
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  contents   LessonContent[]
+  progresses LessonProgress[]
+  test       Test?
+
+  @@unique([chapterId, orderIndex])
+}
+
+model LessonContent {
+  id        String    @id @default(uuid()) @db.Uuid
+  lessonId  String    @db.Uuid
+  lesson    Lesson    @relation(fields: [lessonId], references: [id])
+  blockType BlockType
+  textHtml  String?
+  mediaKey  String?
+  sortIndex Int
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
+model LessonProgress {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @db.Uuid
+  lessonId      String    @db.Uuid
+  user          User      @relation(fields: [userId], references: [id])
+  lesson        Lesson    @relation(fields: [lessonId], references: [id])
+  // JSON c картой прогресса по видео-блокам: { [blockId]: { watchedSec, durationSec, completed } }
+  videoProgress Json
+  completed     Boolean   @default(false)
+  completedAt   DateTime?
+  updatedAt     DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@unique([userId, lessonId])
+}
+
+model Test {
+  id               String   @id @default(uuid()) @db.Uuid
+  // Тест может принадлежать либо главе, либо уроку (одно из полей установлено)
+  courseId         String?  @db.Uuid
+  course           Course?  @relation("CourseTest", fields: [courseId], references: [id])
+  chapterId        String?  @db.Uuid
+  chapter          Chapter? @relation(fields: [chapterId], references: [id])
+  lessonId         String?  @db.Uuid
+  lesson           Lesson?  @relation(fields: [lessonId], references: [id])
+  // Проходной балл можно задавать на уровне теста (для уроков);
+  // для глав при отсутствии используется Chapter.passScore
+  passScore        Int?
+  timeLimitSec     Int?
+  attemptLimit     Int?
+  questionCount    Int?
+  shuffleQuestions Boolean  @default(true)
+  shuffleAnswers   Boolean  @default(true)
+  isPublished      Boolean  @default(false)
+  // Обязателен ли тест для продолжения (актуально для уроков; для глав/курса — на будущее)
+  isMandatory      Boolean  @default(false)
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  sections  TestSection[]
+  questions Question[]
+  attempts  TestAttempt[]
+
+  @@unique([courseId])
+  @@unique([chapterId])
+  @@unique([lessonId])
+}
+
+model TestSection {
+  id          String  @id @default(uuid()) @db.Uuid
+  testId      String  @db.Uuid
+  test        Test    @relation(fields: [testId], references: [id])
+  title       String
+  description String?
+  sortIndex   Int
+
+  questions Question[]
+}
+
+model Question {
+  id          String       @id @default(uuid()) @db.Uuid
+  testId      String       @db.Uuid
+  test        Test         @relation(fields: [testId], references: [id])
+  sectionId   String?      @db.Uuid
+  section     TestSection? @relation(fields: [sectionId], references: [id])
+  type        QuestionType
+  text        String
+  sortIndex   Int
+  points      Int          @default(1)
+
+  answers        Answer[]
+  attemptAnswers AttemptAnswer[]
+}
+
+model Answer {
+  id         String   @id @default(uuid()) @db.Uuid
+  questionId String   @db.Uuid
+  question   Question @relation(fields: [questionId], references: [id])
+  text       String
+  isCorrect  Boolean
+  sortIndex  Int
+}
+
+model TestAttempt {
+  id               String        @id @default(uuid()) @db.Uuid
+  testId           String        @db.Uuid
+  test             Test          @relation(fields: [testId], references: [id])
+  userId           String        @db.Uuid
+  user             User          @relation(fields: [userId], references: [id])
+  startedAt        DateTime      @db.Timestamptz(6)
+  finishedAt       DateTime?     @db.Timestamptz(6)
+  score            Int?
+  status           AttemptStatus
+  questionSnapshot Json
+
+  attemptAnswers AttemptAnswer[]
+}
+
+model AttemptAnswer {
+  id         String      @id @default(uuid()) @db.Uuid
+  attemptId  String      @db.Uuid
+  attempt    TestAttempt @relation(fields: [attemptId], references: [id])
+  questionId String      @db.Uuid
+  question   Question    @relation(fields: [questionId], references: [id])
+  answerIds  String[]    @db.Uuid
+  isCorrect  Boolean
+}
+
+model UserProgress {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @db.Uuid
+  user      User           @relation(fields: [userId], references: [id])
+  chapterId String         @db.Uuid
+  chapter   Chapter        @relation(fields: [chapterId], references: [id])
+  status    ProgressStatus
+  bestScore Int            @default(0)
+  updatedAt DateTime       @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@unique([userId, chapterId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String   @db.Uuid
+  actor     User     @relation("AuditActor", fields: [actorId], references: [id])
+  action    String
+  entity    String
+  entityId  String?  @db.Uuid
+  before    Json?
+  after     Json?
+  ip        String?  @db.Inet
+  ua        String?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([actorId])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
+// New models for courses and access control
+model Course {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String
+  description String?
+  isPublished Boolean  @default(false)
+  isPublic    Boolean  @default(false)
+  isArchived  Boolean  @default(false)
+  version     Int?
+  seriesId    String?  @db.Uuid
+  createdById String?  @db.Uuid
+  updatedById String?  @db.Uuid
+  createdBy   User?    @relation("CourseCreatedBy", fields: [createdById], references: [id])
+  updatedBy   User?    @relation("CourseUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  chapters Chapter[]
+  accesses UserCourseAccess[] @relation("CourseAccessCourse")
+  test     Test?              @relation("CourseTest")
+  prerequisites   CoursePrerequisite[] @relation("CoursePrerequisitesTarget")
+  requiredBy      CoursePrerequisite[] @relation("CoursePrerequisitesSource")
+
+  @@index([seriesId])
+}
+
+model CoursePrerequisite {
+  id               String  @id @default(uuid()) @db.Uuid
+  courseId         String  @db.Uuid
+  requiredCourseId String  @db.Uuid
+  course           Course  @relation("CoursePrerequisitesSource", fields: [courseId], references: [id])
+  requiredCourse   Course  @relation("CoursePrerequisitesTarget", fields: [requiredCourseId], references: [id])
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([courseId, requiredCourseId])
+  @@index([requiredCourseId])
+}
+
+model UserCourseAccess {
+  id       String @id @default(uuid()) @db.Uuid
+  userId   String @db.Uuid
+  courseId String @db.Uuid
+  user     User   @relation("CourseAccessUser", fields: [userId], references: [id])
+  course   Course @relation("CourseAccessCourse", fields: [courseId], references: [id])
+
+  @@unique([userId, courseId])
+  @@index([courseId])
+}

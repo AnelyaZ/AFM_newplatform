@@ -1,0 +1,547 @@
+---
+alwaysApply: true
+---
+# Техническое задание (ТЗ)
+
+**Проект:** Веб‑платформа для обучения сотрудников АФМ\
+**Заказчик:** Департамент экономических расследований\
+**Версия:** 1.0\
+**Дата:** 11.08.2025
+
+---
+
+## 1. Цель и область применения
+
+Создать защищённую веб‑платформу для дистанционного обучения сотрудников АФМ с админ‑панелью для управления пользователями, обучающими главами, тестами и аналитикой успеваемости. Система состоит из двух продуктов: Админ‑панель и Кабинет сотрудника.
+
+---
+
+## 2. Роли и права доступа
+
+- **Гость**: регистрация (создание заявки сотрудника).
+- **Сотрудник**: изучение материалов, прохождение тестов, просмотр результатов/обратной связи.
+- **Администратор**: утверждение регистраций, управление главами/материалами/тестами, выдача прав админа, просмотр и выгрузка отчётов, управление доступами.
+
+Матрица разрешений:
+
+- Гость → POST /auth/register
+- Сотрудник → GET глав/материалов своей доступности; POST/GET попыток тестов; просмотр результатов.
+- Администратор → полный CRUD по пользователям, главам, тестам, материалам, настройкам, отчётам.
+
+---
+
+## 3. Технический стек
+
+- **Backend:** Node.js (LTS), Express.js или NestJS (рекомендуется NestJS), TypeScript.
+- **Frontend:** React (Vite/CRA; рекомендуется Vite), TypeScript, React Router, Zustand/Redux Toolkit.
+- **БД:** PostgreSQL ≥ 14, миграции через Prisma Migrate/Liquibase/TypeORM (рекоменд. Prisma).
+- **Хранилище медиа:** S3‑совместимое (MinIO / AWS S3). Генерация presigned URL.
+- **Аутентификация:** JWT Access + Refresh, bcrypt для хэширования паролей.
+- **Email:** SMTP (gov mail/корп. почта) через Nodemailer, шаблоны MJML.
+- **Развёртывание:** Docker, Docker Compose, Nginx (reverse proxy), HTTPS (Let’s Encrypt/внутренний PKI).
+- **Логи/мониторинг:** Winston + JSON logs, Prometheus + Grafana, Sentry.
+
+---
+
+## 4. Нефункциональные требования
+
+- Доступность: ≥ 99.5% (в рабочие часы), RTO ≤ 4 ч, RPO ≤ 1 ч.
+- Производительность:  P95 отклик API ≤ 300 мс при 200 одновременных пользователях.
+- Масштабируемость: горизонтальное масштабирование backend и stateless фронтенда.
+- Безопасность: HTTPS‑only, HSTS, Content Security Policy, rate‑limit, защита от SQLi/XSS/CSRF, строгая политика паролей.
+- Журналирование аудита: все критичные действия (логин/логаут, CRUD контента, управление доступом, изменения порогов тестов).
+- Резервное копирование: ежедневные снапшоты БД + медиа; хранение ≥ 30 дней.
+- Соответствие: хранение персональных данных в соответствии с законодательством РК; опционально размещение в РК‑ЦОД.
+- Локализация: RU (обяз.), KZ (опц.).
+- Доступность (A11y): WCAG 2.1 AA (навигация с клавиатуры, контрастность, ARIA‑метки).
+
+---
+
+## 5. Бизнес‑логика и правила
+
+1. **Регистрация сотрудника**: Гость заполняет форму (ФИО, должность, дата рождения, email, пароль). Статус **PENDING**. Администратор подтверждает → статус **APPROVED**; иначе **REJECTED**.
+2. **Авторизация**: только APPROVED пользователи. MFA (опционально) через email‑код.
+3. **Главы**: древовидная структура не требуется (линейная нумерация). У каждой главы: контент (текст, изображения, видео), связанный тест, проходной балл `pass_score` (0–100).
+4. **Доступ к главам**: глава N доступна, если тест главы N‑1 пройден (если N>1). Глава 1 доступна всем APPROVED.
+5. **Тест**:
+   - тип: выбор одного/нескольких вариантов; поддержка открытых вопросов (опционально — за пределами MVP).
+   - каждая попытка → случайная перестановка порядка вопросов и вариантов ответов.
+   - конфигурация: лимит времени (сек, опц.), лимит попыток (опц.; по умолчанию — без лимита), количество вопросов из банка (random subset, опц.).
+   - оценивание: автоматическое (по ключам). Процент = `correct/total*100`.
+   - прохождение: если `score >= pass_score`, статус **PASSED**, открывается следующая глава.
+   - обратная связь: для неверных ответов — пояснение (если задано администратором).
+6. **Повторная сдача**: разрешена; при каждой пересдаче действует новая рандомизация.
+7. **Администраторы**: создаются из админ‑панели — ввод email → система шлёт **временный пароль** и ссылку на установку нового пароля. Роль: `ADMIN`.
+8. **Журналы**: действия админов и ключевые события записываются (кто/когда/что, предыдущее и новое значение).
+
+---
+
+## 6. Модель данных (PostgreSQL)
+
+Нотация: PK — первичный ключ, FK — внешний ключ, U — уникальный индекс.
+
+### 6.1 Пользователи и доступы
+
+- **users**
+
+  - `id` UUID PK
+  - `full_name` text NOT NULL
+  - `position` text NOT NULL
+  - `birth_date` date NOT NULL
+  - `email` citext NOT NULL U
+  - `password_hash` text NOT NULL
+  - `role` enum('EMPLOYEE','ADMIN') DEFAULT 'EMPLOYEE'
+  - `status` enum('PENDING','APPROVED','REJECTED') DEFAULT 'PENDING'
+  - `created_at` timestamptz DEFAULT now()
+  - `updated_at` timestamptz DEFAULT now()
+
+- **admin_invites** (выдача прав админа)
+
+  - `id` UUID PK
+  - `email` citext NOT NULL U
+  - `temp_password_hash` text NOT NULL
+  - `invited_by` UUID FK → users(id)
+  - `expires_at` timestamptz NOT NULL
+  - `used_at` timestamptz NULL
+  - `created_at` timestamptz DEFAULT now()
+
+- **sessions** (опц., если храним refresh‑токены)
+
+  - `id` UUID PK
+  - `user_id` UUID FK → users(id)
+  - `refresh_token_hash` text NOT NULL
+  - `ip` inet, `ua` text
+  - `expires_at` timestamptz NOT NULL
+  - `created_at` timestamptz DEFAULT now()
+
+### 6.2 Обучение
+
+- **chapters**
+
+  - `id` UUID PK
+  - `order_index` int NOT NULL U (уникален)
+  - `title` text NOT NULL
+  - `description` text
+  - `pass_score` int NOT NULL CHECK (pass_score BETWEEN 0 AND 100)
+  - `is_published` boolean DEFAULT false
+  - `created_by` UUID FK → users(id)
+  - `updated_by` UUID FK → users(id)
+  - `created_at`, `updated_at` timestamptz
+
+- **chapter_contents** (материалы главы, блочная модель)
+
+  - `id` UUID PK
+  - `chapter_id` UUID FK → chapters(id)
+  - `block_type` enum('TEXT','IMAGE','VIDEO','FILE')
+  - `text_html` text NULL
+  - `media_key` text NULL (S3 key)
+  - `sort_index` int NOT NULL
+  - `created_at`, `updated_at` timestamptz
+
+### 6.3 Тестирование
+
+- **tests** (1:1 с главой)
+
+  - `id` UUID PK
+  - `chapter_id` UUID U FK → chapters(id)
+  - `time_limit_sec` int NULL
+  - `attempt_limit` int NULL
+  - `question_count` int NULL (если подмножество из банка)
+  - `shuffle_questions` boolean DEFAULT true
+  - `shuffle_answers` boolean DEFAULT true
+  - `created_at`, `updated_at` timestamptz
+
+- **questions**
+
+  - `id` UUID PK
+  - `test_id` UUID FK → tests(id)
+  - `type` enum('SINGLE','MULTI')
+  - `text` text NOT NULL
+  - `explanation` text NULL (пояснение при неверном ответе)
+  - `sort_index` int NOT NULL
+
+- **answers**
+
+  - `id` UUID PK
+  - `question_id` UUID FK → questions(id)
+  - `text` text NOT NULL
+  - `is_correct` boolean NOT NULL
+  - `sort_index` int NOT NULL
+
+- **test_attempts**
+
+  - `id` UUID PK
+  - `test_id` UUID FK → tests(id)
+  - `user_id` UUID FK → users(id)
+  - `started_at` timestamptz NOT NULL
+  - `finished_at` timestamptz NULL
+  - `score` int NULL
+  - `status` enum('IN_PROGRESS','PASSED','FAILED')
+  - `question_snapshot` jsonb NOT NULL  (зафиксированный порядок вопросов/ответов на попытку)
+
+- **attempt_answers**
+
+  - `id` UUID PK
+  - `attempt_id` UUID FK → test_attempts(id)
+  - `question_id` UUID FK → questions(id)
+  - `answer_ids` UUID[] NOT NULL
+  - `is_correct` boolean NOT NULL
+
+### 6.4 Прогресс
+
+- **user_progress** (агрегированно по главам)
+  - `id` UUID PK
+  - `user_id` UUID FK → users(id)
+  - `chapter_id` UUID FK → chapters(id)
+  - `status` enum('LOCKED','AVAILABLE','COMPLETED')
+  - `best_score` int DEFAULT 0
+  - `updated_at` timestamptz
+
+### 6.5 Аудит и служебные
+
+- **audit_log**
+  - `id` UUID PK
+  - `actor_id` UUID FK → users(id)
+  - `action` text NOT NULL (e.g., USER_APPROVE, CHAPTER_CREATE, PASS_SCORE_UPDATE)
+  - `entity` text NOT NULL (users/chapters/tests/...)
+  - `entity_id` UUID
+  - `before` jsonb NULL
+  - `after` jsonb NULL
+  - `ip` inet, `ua` text
+  - `created_at` timestamptz DEFAULT now()
+
+Индексы: UQ по email; IX по (user_id, chapter_id); GIN по jsonb‑полям.
+
+---
+
+## 7. API (REST, JSON)
+
+Базовый URL: `/api/v1`\
+Формат ошибок: `{ "error": { "code": string, "message": string, "details"?: any } }`
+
+### 7.1 Аутентификация
+
+- **POST** `/auth/register`
+  - body: `{ fullName, position, birthDate, email, password }`
+  - 201 → `{ id, status: 'PENDING' }`
+- **POST** `/auth/login`
+  - body: `{ email, password }`
+  - 200 → `{ accessToken, refreshToken, user: { id, role, status } }`
+- **POST** `/auth/refresh` → 200 `{ accessToken }`
+- **POST** `/auth/logout` → 204
+
+### 7.2 Администрирование
+
+- **GET** `/admin/users?status=&q=&page=&limit=` (JWT ADMIN)
+- **PATCH** `/admin/users/:id/status`
+  - body: `{ status: 'APPROVED'|'REJECTED' }`
+- **POST** `/admin/invites` (выдача прав админа)
+  - body: `{ email }` → 201, письмо с временным паролем
+- **POST** `/admin/users/:id/role`
+  - body: `{ role: 'ADMIN'|'EMPLOYEE' }`
+- **GET** `/admin/reports/progress?chapterId=&from=&to=`
+- **GET** `/admin/audit?actorId=&action=&from=&to=`
+
+### 7.3 Главы и контент
+
+- **GET** `/chapters` (EMPLOYEE/ADMIN) → список доступных глав (учитывая прогресс пользователя)
+- **GET** `/chapters/:id` → глава + её контент (если доступна)
+- **POST** `/chapters` (ADMIN)
+  - body: `{ orderIndex, title, description, passScore, isPublished }`
+- **PATCH** `/chapters/:id` (ADMIN)
+- **DELETE** `/chapters/:id` (ADMIN)
+
+#### Контент главы (блочный редактор)
+
+- **GET** `/chapters/:id/contents` (ADMIN/EMPLOYEE)
+- **POST** `/chapters/:id/contents` (ADMIN):\
+  `{ blocks: [{ blockType, textHtml?, mediaKey?, sortIndex }] }`
+- **PATCH** `/chapter-contents/:blockId` (ADMIN)
+- **DELETE** `/chapter-contents/:blockId` (ADMIN)
+- **POST** `/uploads/presign` (ADMIN) → `{ url, key, fields }` (для S3)
+
+### 7.4 Тесты и вопросы
+
+- **GET** `/chapters/:id/test` (EMPLOYEE/ADMIN) → meta теста (без ключей)
+- **POST** `/chapters/:id/test` (ADMIN) → создать/обновить тест
+  - body: `{ timeLimitSec?, attemptLimit?, questionCount?, shuffleQuestions?, shuffleAnswers? }`
+- **POST** `/tests/:testId/questions` (ADMIN) → массив вопросов
+  - `{ questions: [{ type, text, explanation?, answers: [{ text, isCorrect }] }] }`
+- **PATCH** `/questions/:id` (ADMIN)
+- **DELETE** `/questions/:id` (ADMIN)
+
+### 7.5 Попытки тестов
+
+- **POST** `/tests/:testId/attempts` (EMPLOYEE)
+  - сервер генерирует `question_snapshot` с рандомизацией; 201 → `{ attemptId, items: [{ questionId, text, type, options: [{ answerId, text }] }], timeLimitSec }`
+- **POST** `/attempts/:attemptId/submit` (EMPLOYEE)
+  - body: `{ answers: [{ questionId, answerIds: [UUID,...] }] }`
+  - сервер проверяет по снимку и ключам → 200 `{ score, status: 'PASSED'|'FAILED', feedback: [{ questionId, explanation? }] }`
+- **GET** `/attempts/:attemptId` → детали попытки (без раскрытия ключей на будущее)
+
+### 7.6 Прогресс и результаты
+
+- **GET** `/me/progress` (EMPLOYEE)
+- **GET** `/admin/progress?userId=&chapterId=` (ADMIN)
+- **GET** `/admin/exports/progress.csv?chapterId=&from=&to=` (ADMIN) → CSV
+
+---
+
+## 8. Алгоритмы и детали реализации
+
+### 8.1 Рандомизация тестов
+
+- При создании попытки:
+  - Берём все вопросы теста (или случайные `question_count`).
+  - Перемешиваем массив вопросов (Fisher‑Yates), если `shuffle_questions=true`.
+  - Для каждого вопроса перемешиваем варианты ответов, если `shuffle_answers=true`.
+  - Сохраняем «снимок» в `test_attempts.question_snapshot` вида:
+  ```json
+  {
+    "questions": [
+      {
+        "qid": "...",
+        "type": "SINGLE",
+        "answers": [ {"aid": "..."}, {"aid": "..."} ]
+      }
+    ]
+  }
+  ```
+- При проверке ответов:
+  - Используем исходные правильные `answers.is_correct`.
+  - Для MULTI сравнение множеств: выбранные == множество `is_correct=true`.
+
+### 8.2 Право доступа к главам
+
+- Для пользователя U: глава N доступна, если `N==1` или `exists attempt PASSED for chapter N-1`.
+- При успешной сдаче главы N: обновить `user_progress` для главы N → COMPLETED; сделать AVAILABLE главу N+1.
+
+### 8.3 Лимиты теста
+
+- Если `time_limit_sec` задан — сервер отслеживает `started_at` + лимит; просрочка → автозавершение как **FAILED**.
+- Если `attempt_limit` задан — запретить создание новой попытки при превышении.
+
+### 8.4 Безопасность
+
+- Пароли: `min 12` символов, классы символов, парольный валидатор, bcrypt saltRounds≥12.
+- JWT: Access TTL 15 мин, Refresh TTL 30 дней. Привязка refresh к `sessions`.
+- Rate limit: `/auth/*` — 10 req/min/IP; общие — 60 req/min/IP.
+- CORS: ограничить домены. CSP: блок внешних скриптов вне allow‑list.
+- Проверка MIME/размера загружаемых медиа, антивирус (clamd) опц.
+- Все админ‑операции логируются в `audit_log`.
+
+---
+
+## 9. UI/UX требования
+
+### 9.1 Админ‑панель
+
+- Разделы: Пользователи, Главы, Материалы (внутри главы), Тесты (внутри главы), Отчёты, Аудит, Настройки.
+- Визуальный редактор материалов (WYSIWYG) с поддержкой вставки изображений/видео (через presigned upload).
+- Конструктор тестов: добавление вопросов, вариантов, отметка правильных, пояснения, сортировка.
+- Таблицы со списками: поиск, фильтры, пагинация.
+- Экспорт CSV/Excel по прогрессу/оценкам.
+
+### 9.2 Кабинет сотрудника
+
+- Онбординг (короткая инструкция).
+- Карточки глав с индикатором доступности/прогресса.
+- Просмотр материалов с оглавлением.
+- Экран теста: таймер, сохранение промежуточных ответов, предупреждение при выходе.
+- Экран результата: сумма баллов, статус, список ошибок с пояснениями.
+- История: таблица попыток с датами и баллами.
+
+---
+
+## 10. Валидации и форматы
+
+- ФИО: 2–200 символов; должность: 2–120; дата рождения: `YYYY‑MM‑DD`.
+- Email: RFC 5322, уникален.
+- Пароль: ≥12 символов; подтверждение пароля.
+- pass_score: 0–100; order_index — уникальный положительный целый.
+- Размер одного медиа ≤ 200 МБ (настройка в .env).
+
+---
+
+## 11. Email‑шаблоны
+
+- Подтверждение регистрации сотрудника (уведомление об APPROVED/REJECTED).
+- Приглашение администратора: временный пароль + ссылка на установку нового.
+- Уведомление о прохождении/непрохождении теста (опц.).
+
+---
+
+## 12. Миграции и начальные данные
+
+- Создать роли `ADMIN`, `EMPLOYEE`.
+- Создать пользователя‑суперадмина (из переменных окружения).
+- Создать первую главу‑пример и тест с 3–5 вопросов (seed данных).
+
+---
+
+## 13. Развёртывание и окружения
+
+- Envs: `DEV`, `STAGE`, `PROD`.
+- Docker Compose: `backend`, `frontend`, `db`, `minio`, `nginx`.
+- Миграции при старте (прерывать на ошибках).
+- Ротация логов; health‑checks `/healthz`.
+
+---
+
+## 14. Тестирование
+
+- Юнит‑тесты backend (Jest) ≥ 70% покрытие критичной логики.
+- Интеграционные тесты API (Supertest) основных сценариев.
+- E2E (Playwright) для критичных пользовательских потоков: регистрация → утверждение → прохождение главы → тест.
+- Нагрузочные тесты (k6) на сценарий 200 одновременных пользователей.
+
+---
+
+## 15. Риски и допущения
+
+- Требования к хранению ПДн в РК могут потребовать локального ЦОД.
+- Видео может быть тяжёлым: возможно, потребуется адаптивный стриминг (HLS) и CDN.
+- MFA может стать обязательным по политике ИБ — оставить в бэклоге как опцию.
+
+---
+
+## 16. План релиза (MVP → V1)
+
+**MVP (6–8 недель):**
+
+- Регистрация/логин/утверждение; CRUD глав; редактор текст/изображение; создание тестов; рандомизация; прохождение/скoring; прогресс; базовые отчёты.
+
+**V1:**
+
+- Видео/HLS, экспорт Excel, расширенная аналитика, MFA, локализация KZ, аудит с диффами, роль «Методист» (контент‑редактор без прав на пользователей).
+
+---
+
+## 17. Примеры запросов/ответов (схемы)
+
+### Создание главы
+
+**POST** `/chapters`
+
+```json
+{
+  "orderIndex": 1,
+  "title": "Основы финансового мониторинга",
+  "description": "Введение в задачи АФМ",
+  "passScore": 70,
+  "isPublished": true
+}
+```
+
+**201**
+
+```json
+{
+  "id": "d1b...",
+  "orderIndex": 1,
+  "title": "Основы финансового мониторинга",
+  "passScore": 70,
+  "isPublished": true
+}
+```
+
+### Создание попытки теста
+
+**POST** `/tests/:testId/attempts` **201**
+
+```json
+{
+  "attemptId": "a89...",
+  "timeLimitSec": 900,
+  "items": [
+    {
+      "questionId": "q1",
+      "text": "Выберите верное утверждение",
+      "type": "SINGLE",
+      "options": [
+        { "answerId": "a1", "text": "..." },
+        { "answerId": "a2", "text": "..." }
+      ]
+    }
+  ]
+}
+```
+
+### Отправка ответов
+
+**POST** `/attempts/:attemptId/submit`
+
+```json
+{
+  "answers": [
+    { "questionId": "q1", "answerIds": ["a2"] },
+    { "questionId": "q2", "answerIds": ["b1","b3"] }
+  ]
+}
+```
+
+**200**
+
+```json
+{
+  "score": 78,
+  "status": "PASSED",
+  "feedback": [
+    { "questionId": "q2", "explanation": "Пересмотрите критерии KYC." }
+  ]
+}
+```
+
+---
+
+## 18. Пример ER‑диаграммы (словесно)
+
+Users (1) — (N) Sessions\
+Users (1) — (N) AuditLog\
+Users (1) — (N) UserProgress — (N) Chapters\
+Chapters (1) — (1) Tests — (N) Questions — (N) Answers\
+Tests (1) — (N) TestAttempts — (N) AttemptAnswers
+
+---
+
+## 19. Критерии приёмки (MVP)
+
+1. Администратор может утвердить нового сотрудника; сотрудник без APPROVED не входит.
+2. Администратор создаёт главы и тесты; указывает `pass_score`.
+3. Сотрудник видит и проходит главу 1; без прохождения не переходит к главе 2.
+4. Порядок вопросов/ответов меняется при каждой попытке.
+5. Отчёт по прогрессу формируется и выгружается в CSV.
+6. Все админ‑действия фиксируются в `audit_log`.
+
+---
+
+## 20. Переменные окружения (пример)
+
+```
+NODE_ENV=production
+PORT=8080
+DATABASE_URL=postgresql://user:pass@db:5432/afm
+JWT_ACCESS_TTL=15m
+JWT_REFRESH_TTL=30d
+JWT_SECRET=...
+BCRYPT_ROUNDS=12
+SMTP_HOST=...
+SMTP_PORT=465
+SMTP_USER=...
+SMTP_PASS=...
+S3_ENDPOINT=http://minio:9000
+S3_BUCKET=afm-media
+S3_ACCESS_KEY=...
+S3_SECRET_KEY=...
+MAX_UPLOAD_MB=200
+RATE_LIMIT_AUTH=10
+RATE_LIMIT_GENERAL=60
+```
+
+---
+
+## 21. Примечания
+
+- В админ‑панели предусмотреть «сухой прогон» теста (preview) без записи в статистику.
+- При удалении главы с тестом — мягкое удаление (soft delete) или запрет, если есть попытки.
+- В отчётах учитывать лучший результат по главе.
