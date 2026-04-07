@@ -54,14 +54,15 @@ export default function App() {
       if (bootstrapped.current) return;
       if (!hydrated) return;
       bootstrapped.current = true;
-      if (!access && user?.id && refresh) {
-        try {
-          const { data } = await api.post('/auth/refresh', { userId: user.id, refreshToken: refresh });
-          setTokens({ accessToken: data.accessToken, refreshToken: refresh });
-        } catch {
-          logout();
-        }
-      }
+if (!access && user?.id && refresh) {
+  try {
+    const { data } = await api.post('/auth/refresh', { userId: user.id, refreshToken: refresh });
+    setTokens({ accessToken: data.accessToken, refreshToken: refresh });
+  } catch {
+    // do nothing
+  }
+}
+
     };
     void bootstrap();
   }, [hydrated, access, refresh, user, setTokens, logout]);
