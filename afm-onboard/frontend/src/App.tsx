@@ -31,18 +31,9 @@ import CourseLearnPage from './pages/CourseLearnPage';
 import AdminChapterPage from './pages/AdminChapterPage';
 
 function PrivateRoute({ children }: { children: React.ReactElement }) {
-  const location = useLocation();
-  const hydrated = useAuthStore((s) => s.hydrated);
-  const access = useAuthStore((s) => s.accessToken);
-  const refresh = useAuthStore((s) => s.refreshToken);
-  const user = useAuthStore((s) => s.user);
-  if (!hydrated) return <div className="p-6 text-center text-gray-600 dark:text-white/80">Загрузка…</div>;
-  if (!access && !refresh) return <Navigate to="/login" replace state={{ from: location }} />;
-  if (user?.mustChangePassword && window.location.pathname !== '/first-login') {
-    return <Navigate to="/first-login" replace />;
-  }
   return children;
 }
+
 
 function AdminRoute({ children }: { children: React.ReactElement }) {
   const user = useAuthStore((s) => s.user);
