@@ -40,9 +40,8 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !url.includes('/auth/refresh')) {
       // If no refresh available → logout
       if (!refreshToken || !user?.id) {
-        useAuthStore.getState().logout();
-        return Promise.reject(error);
-      }
+  return Promise.reject(error);
+}
 
       if (isRefreshing) {
         // Queue the request until refresh completes
