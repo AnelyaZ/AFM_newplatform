@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../lib/api';
+import { uploadFileWithProgress } from '../lib/uploadFile';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Select from '../components/ui/Select';
 import Input from '../components/ui/Input';
 import TextArea from '../components/ui/TextArea';
+import UploadProgress from '../components/ui/UploadProgress';
 import { useToast } from '../components/Toaster';
 
 type Block = { id?: string; blockType: 'TEXT'|'IMAGE'|'VIDEO'|'FILE'; textHtml?: string | null; mediaKey?: string | null; sortIndex: number };
@@ -39,12 +41,9 @@ export default function AdminLessonContentPage() {
     return a.map((x, i) => ({ ...x, sortIndex: i + 1 }));
   });
 
-  const uploadFile = async (file: File) => {
-    const form = new FormData();
-    form.append('file', file);
-   const { data } = await api.post('/uploads/file', form);
-    return data.key as string;
-  };
+  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadFileName, setUploadFileName] = useState('');
 
   const save = async () => {
     // Клиентская валидация: не более одного видео-блока
@@ -120,19 +119,31 @@ export default function AdminLessonContentPage() {
                     <div className="flex items-center gap-2">
                         <Button
                           variant="secondary"
+                          disabled={uploadingIdx !== null}
                           onClick={() => {
                             const input = document.createElement('input');
                             input.type = 'file';
                             input.onchange = async () => {
                               const f = (input.files || [])[0];
                               if (!f) return;
-                              const key = await uploadFile(f);
-                              setBlocks((arr) => arr.map((x, i) => i === idx ? { ...x, mediaKey: key } : x));
+                              setUploadingIdx(idx);
+                              setUploadProgress(0);
+                              setUploadFileName(f.name);
+                              try {
+                                const key = await uploadFileWithProgress(f, setUploadProgress);
+                                setBlocks((arr) => arr.map((x, i) => i === idx ? { ...x, mediaKey: key } : x));
+                                push({ type: 'success', title: 'Файл загружен' });
+                              } catch {
+                                push({ type: 'error', title: 'Ошибка загрузки файла' });
+                              } finally {
+                                setUploadingIdx(null);
+                              }
                             };
                             input.click();
                           }}
-                        >Выберите файл</Button>
-                        {b.mediaKey && (<span className="truncate text-sm text-gray-600 dark:text-white/70">{b.mediaKey}</span>)}
+                        >{uploadingIdx === idx ? 'Загрузка...' : 'Выберите файл'}</Button>
+                        {uploadingIdx === idx && <UploadProgress percent={uploadProgress} fileName={uploadFileName} />}
+                        {b.mediaKey && uploadingIdx !== idx && (<span className="truncate text-sm text-gray-600 dark:text-white/70">{b.mediaKey}</span>)}
                       </div>
                     </div>
                   </div>

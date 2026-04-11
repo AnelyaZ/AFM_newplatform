@@ -89,7 +89,7 @@ logs
 prisma/migrations/*/migration.sql
 
 # Uploads and media files
-uploads/
+# uploads/
 media/
 public/uploads/
 

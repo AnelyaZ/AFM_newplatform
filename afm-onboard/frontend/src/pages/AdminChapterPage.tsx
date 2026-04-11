@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
 import type React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import { uploadFileWithProgress } from '../lib/uploadFile';
 import { toMediaUrl } from '../lib/media';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Select from '../components/ui/Select';
 import Input from '../components/ui/Input';
+import UploadProgress from '../components/ui/UploadProgress';
 // TextArea removed from test builder; still available elsewhere if needed
 import { useToast } from '../components/Toaster';
 import TestEditor from '../test-templates/TestEditor';
@@ -587,13 +589,9 @@ export default function AdminChapterPage() {
     scheduleAutoSave(lessonId);
   };
 
-  const uploadFile = async (file: File) => {
-		const form = new FormData();
-		form.append('file', file);
-		// Не указываем Content-Type вручную, чтобы браузер проставил boundary
-		const { data } = await api.post('/uploads/file', form);
-		return data.key as string;
-	};
+  const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadFileName, setUploadFileName] = useState('');
 
   const saveBlocks = async (lessonId: string) => {
     const latest = draftBlocksRef.current?.[lessonId] || [];
@@ -992,19 +990,32 @@ export default function AdminChapterPage() {
                                       <div className="flex items-center gap-2">
                                         <Button
                                           variant="secondary"
+                                          disabled={uploadingKey !== null}
                                           onClick={() => {
                                           const input = document.createElement('input');
                                           input.type = 'file';
                                           input.onchange = async () => {
                                             const f = (input.files || [])[0];
                                             if (!f) return;
-                                            const key = await uploadFile(f);
-                                            setBlocksFor(l.id, (arr) => arr.map((x, i) => i === idx ? { ...x, mediaKey: key } : x));
+                                            const uKey = `${l.id}-${idx}`;
+                                            setUploadingKey(uKey);
+                                            setUploadProgress(0);
+                                            setUploadFileName(f.name);
+                                            try {
+                                              const key = await uploadFileWithProgress(f, setUploadProgress);
+                                              setBlocksFor(l.id, (arr) => arr.map((x, i) => i === idx ? { ...x, mediaKey: key } : x));
+                                              push({ type: 'success', title: 'Файл загружен' });
+                                            } catch {
+                                              push({ type: 'error', title: 'Ошибка загрузки файла' });
+                                            } finally {
+                                              setUploadingKey(null);
+                                            }
                                           };
                                           input.click();
                                         }}
-                                      >Выберите файл</Button>
-                                      {b.mediaKey && (<span className="truncate text-sm text-gray-600 dark:text-white/70">{b.mediaKey}</span>)}
+                                      >{uploadingKey === `${l.id}-${idx}` ? 'Загрузка...' : 'Выберите файл'}</Button>
+                                      {uploadingKey === `${l.id}-${idx}` && <UploadProgress percent={uploadProgress} fileName={uploadFileName} />}
+                                      {b.mediaKey && uploadingKey !== `${l.id}-${idx}` && (<span className="truncate text-sm text-gray-600 dark:text-white/70">{b.mediaKey}</span>)}
                                       </div>
                                       {b.blockType === 'VIDEO' && b.mediaKey && (
                                         <div className="mt-3">

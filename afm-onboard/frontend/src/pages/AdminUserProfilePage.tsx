@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../lib/api';
+import { uploadFileWithProgress } from '../lib/uploadFile';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
+import UploadProgress from '../components/ui/UploadProgress';
 import { toMediaUrl } from '../lib/media';
 import { useToast } from '../components/Toaster';
 
@@ -46,16 +48,17 @@ export default function AdminUserProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  const [avatarProgress, setAvatarProgress] = useState(0);
+
   const onUploadAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!id) return;
     const file = e.target.files?.[0];
     if (!file) return;
     try {
       setAvatarUploading(true);
-      const form = new FormData();
-      form.append('file', file);
-      const { data: uploaded } = await api.post('/uploads/file', form);
-      await api.patch(`/admin/users/${id}`, { avatarKey: uploaded.key });
+      setAvatarProgress(0);
+      const key = await uploadFileWithProgress(file, setAvatarProgress);
+      await api.patch(`/admin/users/${id}`, { avatarKey: key });
       push({ type: 'success', title: 'Аватар обновлён' });
       await load();
     } catch {
@@ -108,6 +111,7 @@ export default function AdminUserProfilePage() {
               <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
                 <input type="file" accept="image/*" onChange={onUploadAvatar} disabled={avatarUploading} />
               </label>
+              {avatarUploading && <UploadProgress percent={avatarProgress} />}
             </div>
             <div className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

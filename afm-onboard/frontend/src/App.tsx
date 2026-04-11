@@ -31,6 +31,11 @@ import CourseLearnPage from './pages/CourseLearnPage';
 import AdminChapterPage from './pages/AdminChapterPage';
 
 function PrivateRoute({ children }: { children: React.ReactElement }) {
+  const user = useAuthStore((s) => s.user);
+  const accessToken = useAuthStore((s) => s.accessToken);
+  if (!user || !accessToken) {
+    return <Navigate to="/login" replace />;
+  }
   return children;
 }
 

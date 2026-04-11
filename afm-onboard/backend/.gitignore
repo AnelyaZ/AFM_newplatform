@@ -52,8 +52,8 @@ coverage/
 *.sqlite
 *.sqlite3
 
-# Uploads directory
-uploads/
+# Uploads — video files
+uploads/*.mp4
 
 # TypeScript
 *.tsbuildinfo
