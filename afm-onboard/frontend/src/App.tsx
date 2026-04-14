@@ -85,7 +85,7 @@ if (!access && user?.id && refresh) {
             }
           />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/register" element={<RegisterPage />} />
 
           <Route
             path="/admin/users"

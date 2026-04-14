@@ -12,10 +12,11 @@ export class UsersService {
     private readonly settings: SettingsService,
   ) {}
 
-  list(params: { status?: 'PENDING' | 'APPROVED' | 'REJECTED'; q?: string; page?: number; limit?: number }) {
-    const { status, q, page = 1, limit = 20 } = params;
+  list(params: { status?: 'PENDING' | 'APPROVED' | 'REJECTED'; q?: string; page?: number; limit?: number; excludeUserId?: string }) {
+    const { status, q, page = 1, limit = 20, excludeUserId } = params;
     return this.prisma.user.findMany({
       where: {
+        ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
         ...(status ? { status } : {}),
         ...(q
           ? {

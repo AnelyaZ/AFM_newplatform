@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -12,12 +12,13 @@ export class UsersController {
 
   @Get()
   list(
+    @Req() req: any,
     @Query('status') status?: 'PENDING' | 'APPROVED' | 'REJECTED',
     @Query('q') q?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.users.list({ status, q, page: Number(page ?? 1), limit: Number(limit ?? 20) });
+    return this.users.list({ status, q, page: Number(page ?? 1), limit: Number(limit ?? 20), excludeUserId: req.user.userId });
   }
 
   @Patch(':id/status')

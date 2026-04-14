@@ -180,7 +180,8 @@ const THEORY_CHAPTERS = [
   { title: 'Итоги и практические кейсы', description: 'Систематизация знаний, разбор реальных кейсов и тестирование.', passScore: 80 },
 ];
 
-const LESSON_VIDEOS: Record<number, string> = {
+// Видео привязаны к номеру модуля (chapter orderIndex), ставятся на 1-й урок модуля
+const MODULE_VIDEOS: Record<number, string> = {
   5: '1756375148334-cpyfm04y5s5.mp4',
   6: '1756375271239-0ne7ij7l0yy.mp4',
   14: '1756375726103-s46vgy8cbu.mp4',
@@ -213,13 +214,13 @@ async function main() {
   });
 
   console.log('3/6 Теоретические модули...');
-  let globalLessonIdx = 0;
   for (let i = 0; i < THEORY_CHAPTERS.length; i++) {
     const def = THEORY_CHAPTERS[i];
+    const moduleIndex = i + 1; // orderIndex модуля (1-based)
     const ch = await prisma.chapter.upsert({
-      where: { courseId_orderIndex: { courseId: course.id, orderIndex: i + 1 } },
+      where: { courseId_orderIndex: { courseId: course.id, orderIndex: moduleIndex } },
       update: { title: def.title, description: def.description, passScore: def.passScore, isPublished: true, updatedById: admin.id },
-      create: { courseId: course.id, orderIndex: i + 1, title: def.title, description: def.description, passScore: def.passScore, isPublished: true, createdById: admin.id, updatedById: admin.id },
+      create: { courseId: course.id, orderIndex: moduleIndex, title: def.title, description: def.description, passScore: def.passScore, isPublished: true, createdById: admin.id, updatedById: admin.id },
     });
 
     await prisma.chapterContent.deleteMany({ where: { chapterId: ch.id } });
@@ -228,7 +229,6 @@ async function main() {
     });
 
     for (let j = 1; j <= 7; j++) {
-      globalLessonIdx++;
       const lesson = await prisma.lesson.upsert({
         where: { chapterId_orderIndex: { chapterId: ch.id, orderIndex: j } },
         update: { title: `Урок ${j}. Тема и практика`, description: `Подробное изложение темы урока ${j}.` },
@@ -236,10 +236,10 @@ async function main() {
       });
       await prisma.lessonContent.deleteMany({ where: { lessonId: lesson.id } });
 
+      const videoFile = j === 1 ? MODULE_VIDEOS[moduleIndex] : undefined;
       const blocks: any[] = [
         { lessonId: lesson.id, blockType: 'TEXT', textHtml: `<h3>Теория</h3><p>Ключевые понятия, нормативные требования и типовые сценарии.</p>`, sortIndex: 1 },
       ];
-      const videoFile = LESSON_VIDEOS[globalLessonIdx];
       if (videoFile) {
         blocks.push({ lessonId: lesson.id, blockType: 'VIDEO', mediaKey: `/uploads/${videoFile}`, sortIndex: 2 });
       }
@@ -274,6 +274,7 @@ async function main() {
 
   for (const mod of PDF_MODULES) {
     const existing = await prisma.chapter.findFirst({ where: { courseId: course.id, title: mod.title } });
+    const chapterOrder = existing ? existing.orderIndex : nextOrder;
     const chapter = existing || await prisma.chapter.create({
       data: { courseId: course.id, orderIndex: nextOrder++, title: mod.title, description: mod.description, passScore: mod.passScore, isPublished: true, createdById: admin.id, updatedById: admin.id },
     });
@@ -284,20 +285,70 @@ async function main() {
     }
 
     const existingLessons = await prisma.lesson.count({ where: { chapterId: chapter.id } });
-    if (existingLessons > 0) { totalPdfLessons += existingLessons; continue; }
+    if (existingLessons > 0) {
+      totalPdfLessons += existingLessons;
+      // Добавляем видео на 1-й урок если модуль входит в MODULE_VIDEOS
+      const videoFile = MODULE_VIDEOS[chapterOrder];
+      if (videoFile) {
+        const firstLesson = await prisma.lesson.findFirst({ where: { chapterId: chapter.id, orderIndex: 1 } });
+        if (firstLesson) {
+          const hasVideo = await prisma.lessonContent.findFirst({ where: { lessonId: firstLesson.id, blockType: 'VIDEO' } });
+          if (!hasVideo) {
+            // Сдвигаем sortIndex существующих блоков вниз и вставляем видео на позицию 2
+            await prisma.$executeRawUnsafe(
+              `UPDATE "LessonContent" SET "sortIndex" = "sortIndex" + 1 WHERE "lessonId" = $1::uuid AND "sortIndex" >= 2`,
+              firstLesson.id,
+            );
+            await prisma.lessonContent.create({
+              data: { lessonId: firstLesson.id, blockType: 'VIDEO', mediaKey: `/uploads/${videoFile}`, sortIndex: 2 },
+            });
+          }
+        }
+      }
+      continue;
+    }
 
     for (let i = 0; i < mod.lessons.length; i++) {
       const lessonDef = mod.lessons[i];
       const lesson = await prisma.lesson.create({
         data: { chapterId: chapter.id, orderIndex: i + 1, title: lessonDef.title, description: `PDF: ${lessonDef.file}` },
       });
-      await prisma.lessonContent.createMany({
-        data: [
-          { lessonId: lesson.id, blockType: 'TEXT' as any, textHtml: `<h3>${lessonDef.title}</h3><p>Изучите документ ниже.</p>`, sortIndex: 1 },
-          { lessonId: lesson.id, blockType: 'FILE' as any, mediaKey: `/uploads/old-platform/${mod.folder}/${lessonDef.file}`, sortIndex: 2 },
-        ],
-      });
+      const videoFile = i === 0 ? MODULE_VIDEOS[chapterOrder] : undefined;
+      const contentBlocks: any[] = [
+        { lessonId: lesson.id, blockType: 'TEXT' as any, textHtml: `<h3>${lessonDef.title}</h3><p>Изучите документ ниже.</p>`, sortIndex: 1 },
+      ];
+      if (videoFile) {
+        contentBlocks.push({ lessonId: lesson.id, blockType: 'VIDEO' as any, mediaKey: `/uploads/${videoFile}`, sortIndex: 2 });
+      }
+      contentBlocks.push({ lessonId: lesson.id, blockType: 'FILE' as any, mediaKey: `/uploads/old-platform/${mod.folder}/${lessonDef.file}`, sortIndex: videoFile ? 3 : 2 });
+      await prisma.lessonContent.createMany({ data: contentBlocks });
       totalPdfLessons++;
+    }
+  }
+
+  // Миграция: убираем видео из неправильных уроков (старая логика ставила по globalLessonIdx)
+  console.log('4.5/6 Очистка старых видео-блоков...');
+  const allCourseChapters = await prisma.chapter.findMany({
+    where: { courseId: course.id },
+    orderBy: { orderIndex: 'asc' },
+    select: { id: true, orderIndex: true },
+  });
+  for (const ch of allCourseChapters) {
+    const videoModuleFile = MODULE_VIDEOS[ch.orderIndex];
+    const lessons = await prisma.lesson.findMany({
+      where: { chapterId: ch.id },
+      orderBy: { orderIndex: 'asc' },
+      select: { id: true, orderIndex: true },
+    });
+    for (const lesson of lessons) {
+      if (videoModuleFile && lesson.orderIndex === 1) {
+        // Этот урок ДОЛЖЕН иметь видео — не трогаем
+        continue;
+      }
+      // Удаляем видео-блоки из уроков, где их быть не должно
+      await prisma.lessonContent.deleteMany({
+        where: { lessonId: lesson.id, blockType: 'VIDEO' },
+      });
     }
   }
 

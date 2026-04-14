@@ -40,6 +40,10 @@ export class AuthService {
       data.password,
       Number(this.config.get('BCRYPT_ROUNDS') ?? 12),
     );
+    const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
+    if (existing) {
+      throw new (await import('@nestjs/common')).ConflictException('Пользователь с таким email уже существует');
+    }
     const user = await this.prisma.user.create({
       data: {
         id: uuidv4(),
