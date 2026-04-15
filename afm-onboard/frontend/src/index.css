@@ -1,11 +1,15 @@
 @import "tailwindcss";
 
-html { color-scheme: dark !important; }
+html { color-scheme: light; }
+html.dark { color-scheme: dark; }
 html, body, #root { height: 100%; }
 body {
-  @apply bg-[#0e1628] text-gray-100;
+  @apply bg-gray-50 text-gray-900;
   font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
   margin: 0; /* убираем зазор к краям монитора */
+}
+.dark body {
+  @apply bg-[#0e1628] text-gray-100;
 }
 
 /* Двухстрочная обрезка для заголовков */
@@ -16,12 +20,12 @@ body {
   overflow: hidden;
 }
 
-/* Enforce white text color for inputs, textareas and contenteditable areas */
-input,
-textarea,
-[contenteditable=""],
-[contenteditable="true"],
-[contenteditable] {
+/* Enforce white text color for inputs, textareas and contenteditable areas (dark mode only) */
+.dark input,
+.dark textarea,
+.dark [contenteditable=""],
+.dark [contenteditable="true"],
+.dark [contenteditable] {
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important; /* Safari */
 }
@@ -48,6 +52,12 @@ textarea,
 .app-bg {
   position: fixed; inset: 0; pointer-events: none;
   background:
+    radial-gradient(600px 200px at 20% 10%, rgba(14,165,233,0.07), transparent 70%),
+    radial-gradient(600px 200px at 80% 90%, rgba(99,102,241,0.05), transparent 70%),
+    radial-gradient(400px 160px at 80% 10%, rgba(16,185,129,0.04), transparent 70%);
+}
+.dark .app-bg {
+  background:
     radial-gradient(600px 200px at 20% 10%, rgba(14,165,233,0.15), transparent 70%),
     radial-gradient(600px 200px at 80% 90%, rgba(99,102,241,0.12), transparent 70%),
     radial-gradient(400px 160px at 80% 10%, rgba(16,185,129,0.08), transparent 70%);
@@ -55,20 +65,28 @@ textarea,
 
 /* Карточки – стеклянный эффект */
 .glass {
-  background: rgba(17, 24, 39, 0.65); /* slate-900 с прозрачностью */
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
   backdrop-filter: blur(10px);
+}
+.dark .glass {
+  background: rgba(17, 24, 39, 0.65); /* slate-900 с прозрачностью */
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.35);
 }
 
 .ring-brand { box-shadow: 0 0 0 2px rgba(14,165,233,0.4); }
 
 /* Сайдбар и навигация */
-.sidebar-link { @apply rounded-md px-3 py-2 text-sm transition-colors text-gray-200 hover:bg-white/10; }
-.sidebar-link.active { @apply bg-sky-500/20 text-sky-300; }
+.sidebar-link { @apply rounded-md px-3 py-2 text-sm transition-colors text-gray-700 hover:bg-black/5; }
+.dark .sidebar-link { @apply text-gray-200 hover:bg-white/10; }
+.sidebar-link.active { @apply bg-sky-100 text-sky-700; }
+.dark .sidebar-link.active { @apply bg-sky-500/20 text-sky-300; }
 
 /* Заголовки секций в сайдбаре */
-.sidebar-section-label { @apply px-3 text-xs font-semibold uppercase text-gray-400; }
+.sidebar-section-label { @apply px-3 text-xs font-semibold uppercase text-gray-500; }
+.dark .sidebar-section-label { @apply text-gray-400; }
 
 /* Кнопки: слегка раскалённые границы */
 .btn-glow {
@@ -146,13 +164,16 @@ textarea,
   height: 1.5rem;
   min-width: 1.5rem;
   min-height: 1.5rem;
-  border: 1px solid rgba(255,255,255,0.18);
+  border: 1px solid rgba(0,0,0,0.2);
   border-radius: 0.375rem; /* md */
   background: transparent;
   cursor: pointer;
   display: grid;
   place-items: center;
   transition: all 120ms ease;
+}
+.dark .afm-check {
+  border-color: rgba(255,255,255,0.18);
 }
 .afm-check:focus-visible {
   outline: none;
@@ -188,6 +209,10 @@ textarea,
   padding: 0.375rem 0.75rem;
   border: 1px solid rgba(148,163,184,0.35);
   border-radius: 0.375rem;
+  background: #fff;
+  color: rgb(30,41,59); /* slate-800 */
+}
+.dark .afm-select {
   background: #0f172a; /* slate-900 */
   color: rgb(226,232,240); /* slate-200 */
 }
