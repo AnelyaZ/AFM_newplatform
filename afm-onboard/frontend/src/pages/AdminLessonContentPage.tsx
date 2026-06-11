@@ -123,6 +123,9 @@ export default function AdminLessonContentPage() {
                           onClick={() => {
                             const input = document.createElement('input');
                             input.type = 'file';
+                            if (b.blockType === 'VIDEO') input.accept = 'video/mp4,video/webm,video/mov,video/*';
+                            else if (b.blockType === 'IMAGE') input.accept = 'image/*';
+                            else if (b.blockType === 'FILE') input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt';
                             input.onchange = async () => {
                               const f = (input.files || [])[0];
                               if (!f) return;

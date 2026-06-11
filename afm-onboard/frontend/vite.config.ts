@@ -13,11 +13,15 @@ export default defineConfig({
         target: backendUrl,
         changeOrigin: true,
         secure: false,
+        proxyTimeout: 300000, // 5 min for large video uploads
+        timeout: 300000,
       },
       '/uploads': {
         target: backendUrl,
         changeOrigin: true,
         secure: false,
+        proxyTimeout: 300000,
+        timeout: 300000,
       },
     },
   },
