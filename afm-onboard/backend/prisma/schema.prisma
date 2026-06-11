@@ -364,8 +364,8 @@ model SituationTask {
   id        String             @id @default(uuid()) @db.Uuid
   lessonId  String             @unique @db.Uuid
   lesson    Lesson             @relation(fields: [lessonId], references: [id])
-  title     String             @default('Ситуационная задача')
-  scenario  String             @default('')
+  title     String             @default("Ситуационная задача")
+  scenario  String             @default("")
   passScore Int                @default(70)
   createdAt DateTime           @default(now()) @db.Timestamptz(6)
   updatedAt DateTime           @default(now()) @updatedAt @db.Timestamptz(6)
