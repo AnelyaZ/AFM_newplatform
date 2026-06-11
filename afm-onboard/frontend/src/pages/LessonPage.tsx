@@ -237,6 +237,12 @@ export default function LessonPage() {
                 <span className="hidden sm:inline">Пройти тест урока</span>
                 <span className="sm:hidden">Тест урока</span>
               </Button>
+              <Button
+                className="w-full"
+                onClick={() => { navigate(`/lessons/${lesson.id}/situation`); }}
+              >
+                Ситуационная задача
+              </Button>
             </div>
           </div>
         );

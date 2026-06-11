@@ -9,6 +9,7 @@ import CourseDetailPage from './pages/CourseDetailPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import ChapterDetailPage from './pages/ChapterDetailPage';
 import TestRunnerPage from './pages/TestRunnerPage';
+import SituationTaskPage from './pages/SituationTaskPage';
 import Layout from './components/Layout';
 import { ToastProvider } from './components/Toaster';
 import AdminChapterContentPage from './pages/AdminChapterContentPage';
@@ -16,6 +17,7 @@ import AdminLessonsPage from './pages/AdminLessonsPage';
 import AdminLessonContentPage from './pages/AdminLessonContentPage';
 import AdminTestBuilderPage from './pages/AdminTestBuilderPage';
 import AdminLessonTestBuilderPage from './pages/AdminLessonTestBuilderPage';
+import AdminSituationBuilderPage from './pages/AdminSituationBuilderPage';
 import AdminCourseTestBuilderPage from './pages/AdminCourseTestBuilderPage';
 import LessonPage from './pages/LessonPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
@@ -239,6 +241,18 @@ if (!access && user?.id && refresh) {
             }
           />
           <Route
+            path="/admin/lessons/:lessonId/situation"
+            element={
+              <PrivateRoute>
+                <AdminRoute>
+                  <Layout>
+                    <AdminSituationBuilderPage />
+                  </Layout>
+                </AdminRoute>
+              </PrivateRoute>
+            }
+          />
+          <Route
             path="/admin/lessons/:lessonId/test"
             element={
               <PrivateRoute>
@@ -320,6 +334,16 @@ if (!access && user?.id && refresh) {
               <PrivateRoute>
                 <Layout>
                   <TestRunnerPage />
+                </Layout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/lessons/:lessonId/situation"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <SituationTaskPage />
                 </Layout>
               </PrivateRoute>
             }

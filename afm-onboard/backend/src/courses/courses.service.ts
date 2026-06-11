@@ -44,29 +44,64 @@ export class CoursesService {
       courses.map((c) => [c.id, allChapters.filter((ch) => ch.courseId === c.id).map((ch) => ch.id)]),
     );
 
-    // Прогресс пользователя по завершённым главам и их лучшие баллы
+    // Прогресс пользователя по главам (все записи, не только COMPLETED)
     const chapterIds = allChapters.map((ch) => ch.id);
-    const completedProgress = chapterIds.length
+    const allProgress = chapterIds.length
       ? await this.prisma.userProgress.findMany({
-          where: { userId, chapterId: { in: chapterIds }, status: 'COMPLETED' },
-          select: { chapterId: true, bestScore: true },
+          where: { userId, chapterId: { in: chapterIds } },
+          select: { chapterId: true, bestScore: true, status: true },
         })
       : [];
 
-    const completedByChapter = new Map<string, number>();
-    for (const p of completedProgress) completedByChapter.set(p.chapterId, p.bestScore || 0);
+    // Прогресс по урокам для подсчёта частичного прогресса
+    const allLessons = chapterIds.length
+      ? await this.prisma.lesson.findMany({
+          where: { chapterId: { in: chapterIds } },
+          select: { id: true, chapterId: true },
+        })
+      : [];
+    const lessonIds = allLessons.map((l) => l.id);
+    const lessonProgress = lessonIds.length
+      ? await this.prisma.lessonProgress.findMany({
+          where: { userId, lessonId: { in: lessonIds }, completed: true },
+          select: { lessonId: true },
+        })
+      : [];
+    const completedLessonIds = new Set(lessonProgress.map((lp) => lp.lessonId));
+    const lessonsByChapter = new Map<string, string[]>();
+    for (const l of allLessons) {
+      const arr = lessonsByChapter.get(l.chapterId) || [];
+      arr.push(l.id);
+      lessonsByChapter.set(l.chapterId, arr);
+    }
+
+    const progressByChapter = new Map<string, { bestScore: number; status: string }>();
+    for (const p of allProgress) progressByChapter.set(p.chapterId, { bestScore: p.bestScore || 0, status: p.status });
 
     // Формируем ответ с прогрессом и средним баллом
     return courses.map((c) => {
       const chIds = chaptersByCourse.get(c.id) || [];
       const totalChapters = chIds.length;
-      const completedScores: number[] = chIds
-        .map((id) => completedByChapter.get(id))
-        .filter((v): v is number => typeof v === 'number');
-      const completedChapters = completedScores.length;
-      const progressPercent = totalChapters > 0 ? Math.round((completedChapters / totalChapters) * 100) : 0;
-      const avgScore = completedScores.length > 0
-        ? Math.round(completedScores.reduce((s, v) => s + v, 0) / completedScores.length)
+
+      // progressPercent: считаем по урокам и баллам
+      let totalProgress = 0;
+      const scoresForAvg: number[] = [];
+      for (const chId of chIds) {
+        const prog = progressByChapter.get(chId);
+        const lessons = lessonsByChapter.get(chId) || [];
+        const completedLessons = lessons.filter((lid) => completedLessonIds.has(lid)).length;
+        const lessonProgress = lessons.length > 0 ? completedLessons / lessons.length : 0;
+        if (prog?.status === 'COMPLETED') {
+          totalProgress += 1;
+        } else if (lessonProgress > 0) {
+          totalProgress += lessonProgress * 0.8; // уроки дают до 80% вклада в прогресс модуля
+        }
+        if (prog && prog.bestScore > 0) scoresForAvg.push(prog.bestScore);
+      }
+
+      const progressPercent = totalChapters > 0 ? Math.round((totalProgress / totalChapters) * 100) : 0;
+      const avgScore = scoresForAvg.length > 0
+        ? Math.round(scoresForAvg.reduce((s, v) => s + v, 0) / scoresForAvg.length)
         : 0;
       return { ...c, progressPercent, avgScore } as any;
     });
@@ -123,13 +158,8 @@ export class CoursesService {
       const total = ids.length;
       const done = ids.filter((lid) => completedLessons.has(lid)).length;
       const progressPercent = total > 0 ? Math.round((done / total) * 100) : 0;
-      let status: 'LOCKED' | 'AVAILABLE' | 'COMPLETED' = 'LOCKED';
+      let status: 'LOCKED' | 'AVAILABLE' | 'COMPLETED' = 'AVAILABLE';
       if (completedChapters.has(c.id)) status = 'COMPLETED';
-      else if (c.orderIndex === 1) status = 'AVAILABLE';
-      else {
-        const prev = (course.chapters || []).find((x) => x.orderIndex === c.orderIndex - 1);
-        status = prev && completedChapters.has(prev.id) ? 'AVAILABLE' : 'LOCKED';
-      }
       const bestScore = bestScoreByChapter.get(c.id) ?? 0;
       return { ...c, status, progressPercent, bestScore } as any;
     });
@@ -535,5 +565,8 @@ export class CoursesService {
     return created;
   }
 }
+
+
+
 
 

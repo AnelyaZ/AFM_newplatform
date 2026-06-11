@@ -30,13 +30,7 @@ export class AuthService {
   ) {}
 
   async register(data: RegisterDto) {
-    // Проверяем код регистрации
-    const expectedCode = await this.settings.getRegistrationCode();
-    const provided = (data.registrationCode || '').trim();
-    if (!provided || provided !== expectedCode) {
-      throw new (await import('@nestjs/common')).UnauthorizedException('Неверный код регистрации');
-    }
-    const passwordHash = await bcrypt.hash(
+const passwordHash = await bcrypt.hash(
       data.password,
       Number(this.config.get('BCRYPT_ROUNDS') ?? 12),
     );
@@ -151,5 +145,6 @@ export class AuthService {
     }
   }
 }
+
 
 

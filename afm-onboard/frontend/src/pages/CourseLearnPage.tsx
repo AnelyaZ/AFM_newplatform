@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import api from '../lib/api';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -7,6 +7,7 @@ import Button from '../components/ui/Button';
 type Chapter = { id: string; orderIndex: number; title: string; description?: string; _count?: { lessons?: number }; status?: 'LOCKED'|'AVAILABLE'|'COMPLETED'; progressPercent?: number; bestScore?: number };
 
 export default function CourseLearnPage() {
+  const navigate = useNavigate();
   const { courseId } = useParams();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState<string | null>('');
@@ -67,22 +68,31 @@ export default function CourseLearnPage() {
                   </div>
                 </div>
                 <div className="mt-2 flex items-center justify-between">
-                  <div className="text-xs text-gray-600 dark:text-white/70">Оценка за тест модуля: <span className="font-medium text-gray-800 dark:text-white">{typeof m.bestScore === 'number' ? `${m.bestScore}%` : '—'}</span></div>
-                  <Link to={`/chapters/${m.id}`}>
-                    <Button disabled={m.status === 'LOCKED'} title={m.status === 'LOCKED' ? 'Модуль заблокирован' : undefined}>
-                      {m.status === 'COMPLETED' ? (
-                        <>
-                          <span className="hidden sm:inline">Просмотреть</span>
-                          <span className="sm:hidden">Просмотр</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="hidden sm:inline">Открыть модуль</span>
-                          <span className="sm:hidden">Модуль</span>
-                        </>
-                      )}
-                    </Button>
-                  </Link>
+                  <div className="text-xs text-gray-600 dark:text-white/70">Оценка за тест модуля: <span className="font-medium text-gray-800 dark:text-white">{typeof m.bestScore === 'number' && m.bestScore > 0 ? `${m.bestScore}%` : '0%'}</span></div>
+                  <Button
+                    disabled={m.status === 'LOCKED'}
+                    title={m.status === 'LOCKED' ? 'Модуль заблокирован' : undefined}
+                    onClick={async () => {
+                      if (m.status === 'LOCKED') return;
+                      try {
+                        const { data } = await api.get(`/chapters/${m.id}/lessons`);
+                        const first = Array.isArray(data) && data.length > 0 ? data[0] : null;
+                        if (first) { navigate(`/lessons/${first.id}`); } else { navigate(`/chapters/${m.id}`); }
+                      } catch { navigate(`/chapters/${m.id}`); }
+                    }}
+                  >
+                    {m.status === 'COMPLETED' ? (
+                      <>
+                        <span className="hidden sm:inline">Просмотреть</span>
+                        <span className="sm:hidden">Просмотр</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="hidden sm:inline">Открыть модуль</span>
+                        <span className="sm:hidden">Модуль</span>
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
             ))}
@@ -107,5 +117,4 @@ export default function CourseLearnPage() {
     </div>
   );
 }
-
 

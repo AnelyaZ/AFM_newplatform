@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -13,6 +13,7 @@ type Chapter = { id: string; orderIndex: number; title: string; description?: st
 export default function CourseDetailPage() {
   const { courseId } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState<string | null>('');
   const [modules, setModules] = useState<Chapter[]>([]);
@@ -56,7 +57,6 @@ export default function CourseDetailPage() {
       if (!courseId) return;
       setLoading(true);
       try {
-        // Выбираем API в зависимости от роли пользователя
         const isAdmin = user?.role === 'ADMIN';
         const apiEndpoint = isAdmin ? `/courses/admin/by-id/${courseId}` : `/courses/${courseId}`;
         
@@ -67,7 +67,6 @@ export default function CourseDetailPage() {
         setIsPublished(!!data.isPublished);
         setVersion(typeof data.version === 'number' ? data.version : null);
         
-        // Загружаем пререквизиты только для админов
         if (isAdmin) {
           try {
             const pre = await api.get(`/courses/${courseId}/prerequisites`).then((r) => r.data);
@@ -89,7 +88,6 @@ export default function CourseDetailPage() {
 
   useEffect(() => {
     autoResizeDesc();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [description]);
 
   useEffect(() => {
@@ -104,9 +102,7 @@ export default function CourseDetailPage() {
       if (!testMenuRef.current.contains(e.target as Node)) setOpenTestMenu(false);
     };
     if (openTestMenu) document.addEventListener('mousedown', onDocClick);
-    return () => {
-      document.removeEventListener('mousedown', onDocClick);
-    };
+    return () => { document.removeEventListener('mousedown', onDocClick); };
   }, [openTestMenu]);
 
   useEffect(() => {
@@ -123,7 +119,6 @@ export default function CourseDetailPage() {
     if (!courseId || user?.role !== 'ADMIN') return;
     const isAdmin = user?.role === 'ADMIN';
     const apiEndpoint = isAdmin ? `/courses/admin/by-id/${courseId}` : `/courses/${courseId}`;
-    
     const { data } = await api.get(apiEndpoint);
     setModules(data.chapters || []);
     setIsPublished(!!data.isPublished);
@@ -139,24 +134,18 @@ export default function CourseDetailPage() {
     }
   };
 
-  // Авто-отмена пустых черновиков: переносим удаление только на unload-событие браузера без повторного вызова в cleanup
   useEffect(() => {
     const onBeforeUnload = () => {
-      // Блокируем повторные тосты: тихий запрос
       try {
         if (!courseId || user?.role !== 'ADMIN') return;
         const empty = (title.trim() === '' && (description || '').trim() === '' && (modules || []).length === 0);
         if (isDraftOpen && empty) {
-          // Отправляем фоново, без ожидания
-          // fetch используем напрямую, чтобы не триггерить интерсептор и тосты
           navigator.sendBeacon?.(`${api.defaults.baseURL}/courses/${courseId}?access_token=${encodeURIComponent((useAuthStore.getState().accessToken || ''))}`, new Blob());
         }
       } catch {}
     };
     window.addEventListener('beforeunload', onBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', onBeforeUnload);
-    };
+    return () => { window.removeEventListener('beforeunload', onBeforeUnload); };
   }, [isDraftOpen, courseId, title, description, modules, user?.role]);
 
   const loadParticipants = async () => {
@@ -173,7 +162,6 @@ export default function CourseDetailPage() {
     if (user?.role === 'ADMIN') {
       loadParticipants();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId, user?.role]);
 
   useEffect(() => {
@@ -195,10 +183,7 @@ export default function CourseDetailPage() {
         setUserOptions([]);
       }
     }, 300);
-    return () => {
-      active = false;
-      clearTimeout(t);
-    };
+    return () => { active = false; clearTimeout(t); };
   }, [uq, user?.role]);
 
   const isParticipant = (userId: string) => {
@@ -258,7 +243,6 @@ export default function CourseDetailPage() {
         return api.patch(`/chapters/${m.id}`, { orderIndex: desired });
       }).filter(Boolean) as Promise<any>[];
       if (updates.length) await Promise.all(updates);
-      // Update local indices to match
       setModules((prev) => prev.map((m) => ({ ...m, orderIndex: list.find((x) => x.id === m.id)?.orderIndex ?? m.orderIndex })));
       push({ type: 'success', title: 'Порядок модулей обновлён' });
     } catch {
@@ -277,17 +261,11 @@ export default function CourseDetailPage() {
     const arr = [...modules];
     const [moved] = arr.splice(from, 1);
     arr.splice(to, 0, moved);
-    // Renumber locally for UX
     const renumbered = arr.map((m, i) => ({ ...m, orderIndex: i + 1 }));
     setModules(renumbered);
     setDraggingId(null);
     await persistOrder(renumbered);
   };
-
-  // const removeModule = async (id: string) => {
-  //   await api.delete(`/chapters/${id}`);
-  //   await reload();
-  // };
 
   const startEditModule = (m: Chapter) => {
     setEditingId(m.id);
@@ -330,7 +308,21 @@ export default function CourseDetailPage() {
     }
   };
 
-  const participantsLocked = user?.role !== 'ADMIN' || !isPublished; // при снятой публикации/черновике блокируем участников
+  // NEW: navigate non-admin users directly to first lesson of a module
+  const handleOpenModule = async (chapterId: string) => {
+    try {
+      const { data } = await api.get(`/chapters/${chapterId}/lessons`);
+      if (Array.isArray(data) && data.length > 0) {
+        navigate(`/lessons/${data[0].id}`);
+      } else {
+        navigate(`/chapters/${chapterId}`);
+      }
+    } catch {
+      navigate(`/chapters/${chapterId}`);
+    }
+  };
+
+  const participantsLocked = user?.role !== 'ADMIN' || !isPublished;
 
   if (loading) return <div>Загрузка...</div>;
 
@@ -432,7 +424,6 @@ export default function CourseDetailPage() {
         </div>
       </Card>
 
-      {/* Табы: Модули | Участники */}
       <div className="flex items-center gap-2">
         <button
           className={`rounded px-3 py-1 text-sm ${activeTab === 'modules' ? 'bg-sky-600 text-white' : 'bg-black/5 text-gray-700 hover:bg-black/10 dark:bg-white/10 dark:text-white/80 dark:hover:bg-white/15'}`}
@@ -449,7 +440,6 @@ export default function CourseDetailPage() {
             className={`rounded px-3 py-1 text-sm ${activeTab === 'settings' ? 'bg-sky-600 text-white' : 'bg-black/5 text-gray-700 hover:bg-black/10 dark:bg-white/10 dark:text-white/80 dark:hover:bg-white/15'}`}
             onClick={async () => {
               setActiveTab('settings');
-              // лениво загрузим список курсов для выбора
               try {
                 const { data } = await api.get('/courses/admin/list');
                 const options = (Array.isArray(data) ? data : []).map((c: any) => ({ id: c.id, title: `${c.title}${typeof c.version === 'number' ? ` (V${c.version})` : ''}` }));
@@ -476,150 +466,149 @@ export default function CourseDetailPage() {
         >
           <div className="max-h-[70vh] overflow-y-auto pr-1 styled-scrollbar">
             <div className="relative">
-            {isOrdering && user?.role === 'ADMIN' && (
-              <div className="pointer-events-none absolute inset-0 rounded-md ring-1 ring-sky-400/40" />
-            )}
+              {isOrdering && user?.role === 'ADMIN' && (
+                <div className="pointer-events-none absolute inset-0 rounded-md ring-1 ring-sky-400/40" />
+              )}
               <div className="grid grid-cols-1 gap-3">
-            {modules.map((m) => (
-              <div
-                key={m.id}
-                draggable={user?.role === 'ADMIN'}
-                onDragStart={() => { if (user?.role === 'ADMIN') { setDraggingId(m.id); setDragOverId(null); } }}
-                onDragOver={(e) => { if (user?.role === 'ADMIN') { e.preventDefault(); if (dragOverId !== m.id) setDragOverId(m.id); } }}
-                onDragLeave={() => { if (user?.role === 'ADMIN' && dragOverId === m.id) setDragOverId(null); }}
-                onDragEnd={() => { if (user?.role === 'ADMIN') { setDraggingId(null); setDragOverId(null); } }}
-                onDrop={() => { if (user?.role === 'ADMIN' && (version ?? 0) === 0) { void handleDropReorder(m.id); } setDragOverId(null); }}
-                className={`rounded border p-3 transition-colors ${draggingId === m.id ? 'opacity-70' : ''} ${dragOverId === m.id ? 'border-sky-400 ring-2 ring-sky-200 dark:ring-sky-500/30' : 'border-black/10 dark:border-white/10'} ${(version ?? 0) > 0 ? 'cursor-not-allowed' : ''} ${user?.role !== 'ADMIN' ? 'cursor-default' : ''} flex h-full flex-col`}
-                title={(version ?? 0) > 0 ? 'Редактирование заблокировано для зафиксированных версий' : user?.role === 'ADMIN' ? 'Перетащите для изменения порядка' : 'Просмотр модуля'}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 flex-1 items-start gap-2">
-                    <span className={`select-none text-gray-400 ${user?.role === 'ADMIN' ? (draggingId ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'}`}>⋮⋮</span>
-                    {editingId === m.id ? (
-                      <input
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void saveEditModule(m.id); } if (e.key === 'Escape') { e.preventDefault(); cancelEditModule(); } }}
-                        className="w-full flex-1 min-w-0 rounded-md border border-black/10 bg-transparent px-2 py-1 text-sm font-semibold outline-none focus:border-sky-500 dark:border-white/10 dark:text-white"
-                        placeholder="Заголовок модуля"
-                        disabled={user?.role !== 'ADMIN'}
-                      />
-                    ) : (
-                      <div className="font-semibold" title={m.title} style={{ display: '-webkit-box', WebkitLineClamp: 3 as any, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>{m.orderIndex}. {m.title}</div>
-                    )}
-                  </div>
-                  {user?.role === 'ADMIN' && (version ?? 0) === 0 && (
-                    <div data-module-menu className="relative">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === m.id ? null : m.id); }}
-                        className="rounded p-1 text-gray-600 hover:bg-black/5 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-400/40 dark:text-white/70 dark:hover:bg-white/10"
-                        aria-label="Действия модуля"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
-                      </button>
-                      {menuOpenId === m.id && (
-                        <div className="absolute right-0 z-10 mt-2 w-48 overflow-hidden rounded-md border border-black/10 bg-white py-1 shadow-lg ring-1 ring-black/10 dark:border-white/10 dark:bg-neutral-900 dark:ring-white/10">
+                {modules.map((m) => (
+                  <div
+                    key={m.id}
+                    draggable={user?.role === 'ADMIN'}
+                    onDragStart={() => { if (user?.role === 'ADMIN') { setDraggingId(m.id); setDragOverId(null); } }}
+                    onDragOver={(e) => { if (user?.role === 'ADMIN') { e.preventDefault(); if (dragOverId !== m.id) setDragOverId(m.id); } }}
+                    onDragLeave={() => { if (user?.role === 'ADMIN' && dragOverId === m.id) setDragOverId(null); }}
+                    onDragEnd={() => { if (user?.role === 'ADMIN') { setDraggingId(null); setDragOverId(null); } }}
+                    onDrop={() => { if (user?.role === 'ADMIN' && (version ?? 0) === 0) { void handleDropReorder(m.id); } setDragOverId(null); }}
+                    className={`rounded border p-3 transition-colors ${draggingId === m.id ? 'opacity-70' : ''} ${dragOverId === m.id ? 'border-sky-400 ring-2 ring-sky-200 dark:ring-sky-500/30' : 'border-black/10 dark:border-white/10'} ${(version ?? 0) > 0 ? 'cursor-not-allowed' : ''} ${user?.role !== 'ADMIN' ? 'cursor-default' : ''} flex h-full flex-col`}
+                    title={(version ?? 0) > 0 ? 'Редактирование заблокировано для зафиксированных версий' : user?.role === 'ADMIN' ? 'Перетащите для изменения порядка' : 'Просмотр модуля'}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 flex-1 items-start gap-2">
+                        <span className={`select-none text-gray-400 ${user?.role === 'ADMIN' ? (draggingId ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'}`}>⋮⋮</span>
+                        {editingId === m.id ? (
+                          <input
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void saveEditModule(m.id); } if (e.key === 'Escape') { e.preventDefault(); cancelEditModule(); } }}
+                            className="w-full flex-1 min-w-0 rounded-md border border-black/10 bg-transparent px-2 py-1 text-sm font-semibold outline-none focus:border-sky-500 dark:border-white/10 dark:text-white"
+                            placeholder="Заголовок модуля"
+                            disabled={user?.role !== 'ADMIN'}
+                          />
+                        ) : (
+                          <div className="font-semibold" title={m.title} style={{ display: '-webkit-box', WebkitLineClamp: 3 as any, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>{m.orderIndex}. {m.title}</div>
+                        )}
+                      </div>
+                      {user?.role === 'ADMIN' && (version ?? 0) === 0 && (
+                        <div data-module-menu className="relative">
                           <button
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-800 hover:bg-black/5 dark:text-white dark:hover:bg-white/10"
-                            onClick={() => startEditModule(m)}
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === m.id ? null : m.id); }}
+                            className="rounded p-1 text-gray-600 hover:bg-black/5 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-400/40 dark:text-white/70 dark:hover:bg-white/10"
+                            aria-label="Действия модуля"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-                            <span>Редактировать</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
                           </button>
-                          <button
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
-                            onClick={() => confirmDeleteModule(m.id)}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                            <span>Удалить</span>
-                          </button>
+                          {menuOpenId === m.id && (
+                            <div className="absolute right-0 z-10 mt-2 w-48 overflow-hidden rounded-md border border-black/10 bg-white py-1 shadow-lg ring-1 ring-black/10 dark:border-white/10 dark:bg-neutral-900 dark:ring-white/10">
+                              <button
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-800 hover:bg-black/5 dark:text-white dark:hover:bg-white/10"
+                                onClick={() => startEditModule(m)}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                                <span>Редактировать</span>
+                              </button>
+                              <button
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                onClick={() => confirmDeleteModule(m.id)}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                                <span>Удалить</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-                {editingId === m.id ? (
-                  <div className="mt-2 space-y-2">
-                    <textarea
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      placeholder="Короткое описание"
-                      className="min-h-[60px] w-full rounded-md border border-black/10 bg-transparent px-2 py-1 text-sm outline-none focus:border-sky-500 dark:border-white/10 dark:text-white"
-                    />
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" onClick={() => saveEditModule(m.id)} disabled={user?.role !== 'ADMIN'}>Сохранить</Button>
-                      <Button size="sm" variant="secondary" onClick={cancelEditModule}>Отмена</Button>
+                    {editingId === m.id ? (
+                      <div className="mt-2 space-y-2">
+                        <textarea
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                          placeholder="Короткое описание"
+                          className="min-h-[60px] w-full rounded-md border border-black/10 bg-transparent px-2 py-1 text-sm outline-none focus:border-sky-500 dark:border-white/10 dark:text-white"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" onClick={() => saveEditModule(m.id)} disabled={user?.role !== 'ADMIN'}>Сохранить</Button>
+                          <Button size="sm" variant="secondary" onClick={cancelEditModule}>Отмена</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-600 dark:text-white/70" style={{ display: '-webkit-box', WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>{m.description}</div>
+                    )}
+                    <div className="flex-1" />
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="whitespace-nowrap rounded-full bg-black/5 px-2 py-0.5 text-xs text-gray-700 dark:bg-white/10 dark:text-white/80">Уроков: {m._count?.lessons ?? 0}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {editingId === m.id ? null : (
+                          user?.role === 'ADMIN' ? (
+                            <Link to={`/admin/chapters/${m.id}`}>
+                              <Button disabled={isOrdering && user?.role === 'ADMIN'}>Открыть модуль</Button>
+                            </Link>
+                          ) : (
+                            // NON-ADMIN: skip module page, go directly to first lesson
+                            <Button onClick={() => handleOpenModule(m.id)}>Изучить модуль</Button>
+                          )
+                        )}
+                      </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-sm text-gray-600 dark:text-white/70" style={{ display: '-webkit-box', WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>{m.description}</div>
+                ))}
+                {creatingModule && (
+                  <div className="rounded border-2 border-dashed border-sky-400/60 p-3">
+                    <div className="text-xs uppercase text-sky-600 dark:text-sky-300">Новый модуль</div>
+                    <div className="mt-2 space-y-2">
+                      <input
+                        ref={createTitleRef}
+                        value={creatingModule.title}
+                        onChange={(e) => user?.role === 'ADMIN' && setCreatingModule({ ...creatingModule, title: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && (creatingModule.title || '').trim() && user?.role === 'ADMIN') {
+                            e.preventDefault();
+                            void saveNewModule();
+                          }
+                        }}
+                        placeholder="Заголовок модуля"
+                        className="w-full rounded-md border border-black/10 bg-transparent px-2 py-1 text-sm outline-none focus:border-sky-500 dark:border-white/10 dark:text-white"
+                        disabled={user?.role !== 'ADMIN'}
+                      />
+                      <textarea
+                        value={creatingModule.description}
+                        onChange={(e) => user?.role === 'ADMIN' && setCreatingModule({ ...creatingModule, description: e.target.value })}
+                        placeholder="Короткое описание"
+                        className="min-h-[60px] w-full rounded-md border border-black/10 bg-transparent px-2 py-1 text-sm outline-none focus:border-sky-500 dark:border-white/10 dark:text-white"
+                        disabled={user?.role !== 'ADMIN'}
+                      />
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" onClick={saveNewModule} disabled={!creatingModule.title.trim() || user?.role !== 'ADMIN'}>Создать</Button>
+                        <Button size="sm" variant="secondary" onClick={() => user?.role === 'ADMIN' && setCreatingModule(null)}>Отмена</Button>
+                      </div>
+                    </div>
+                  </div>
                 )}
-                <div className="flex-1" />
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="whitespace-nowrap rounded-full bg-black/5 px-2 py-0.5 text-xs text-gray-700 dark:bg-white/10 dark:text-white/80">Уроков: {m._count?.lessons ?? 0}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {editingId === m.id ? null : (
-                      user?.role === 'ADMIN' ? (
-                        <Link to={`/admin/chapters/${m.id}`}>
-                          <Button disabled={isOrdering && user?.role === 'ADMIN'}>Открыть модуль</Button>
-                        </Link>
-                      ) : (
-                        <Link to={`/chapters/${m.id}`}>
-                          <Button>Изучить модуль</Button>
-                        </Link>
-                      )
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-            {creatingModule && (
-              <div className="rounded border-2 border-dashed border-sky-400/60 p-3">
-                <div className="text-xs uppercase text-sky-600 dark:text-sky-300">Новый модуль</div>
-                <div className="mt-2 space-y-2">
-                  <input
-                    ref={createTitleRef}
-                    value={creatingModule.title}
-                    onChange={(e) => user?.role === 'ADMIN' && setCreatingModule({ ...creatingModule, title: e.target.value })}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (creatingModule.title || '').trim() && user?.role === 'ADMIN') {
-                        e.preventDefault();
-                        void saveNewModule();
-                      }
-                    }}
-                    placeholder="Заголовок модуля"
-                    className="w-full rounded-md border border-black/10 bg-transparent px-2 py-1 text-sm outline-none focus:border-sky-500 dark:border-white/10 dark:text-white"
-                    disabled={user?.role !== 'ADMIN'}
-                  />
-                  <textarea
-                    value={creatingModule.description}
-                    onChange={(e) => user?.role === 'ADMIN' && setCreatingModule({ ...creatingModule, description: e.target.value })}
-                    placeholder="Короткое описание"
-                    className="min-h-[60px] w-full rounded-md border border-black/10 bg-transparent px-2 py-1 text-sm outline-none focus:border-sky-500 dark:border-white/10 dark:text-white"
-                    disabled={user?.role !== 'ADMIN'}
-                  />
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" onClick={saveNewModule} disabled={!creatingModule.title.trim() || user?.role !== 'ADMIN'}>Создать</Button>
-                    <Button size="sm" variant="secondary" onClick={() => user?.role === 'ADMIN' && setCreatingModule(null)}>Отмена</Button>
-                  </div>
-                </div>
-              </div>
-            )}
-              {!creatingModule && user?.role === 'ADMIN' && (
-                <button
-                  type="button"
-                  onClick={() => setCreatingModule({ title: '', description: '' })}
-                  className="w-full rounded-lg border-2 border-dashed border-black/20 py-5 text-sm font-medium text-gray-700 hover:bg-black/5 focus:outline-none focus:ring-2 focus:ring-sky-400/40 dark:border-white/15 dark:text-gray-200 dark:hover:bg-white/10"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    Добавить модуль
-                  </span>
-                </button>
-              )}
+                {!creatingModule && user?.role === 'ADMIN' && (
+                  <button
+                    type="button"
+                    onClick={() => setCreatingModule({ title: '', description: '' })}
+                    className="w-full rounded-lg border-2 border-dashed border-black/20 py-5 text-sm font-medium text-gray-700 hover:bg-black/5 focus:outline-none focus:ring-2 focus:ring-sky-400/40 dark:border-white/15 dark:text-gray-200 dark:hover:bg-white/10"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      Добавить модуль
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -639,73 +628,72 @@ export default function CourseDetailPage() {
         >
           <div className="max-h-[70vh] overflow-y-auto pr-1 styled-scrollbar">
             <div className="grid grid-cols-1 gap-3">
-            <div>
-              <Input
-                label="Добавить участника"
-                placeholder="Поиск по ФИО или email"
-                value={uq}
-                onChange={(e) => setUq(e.target.value)}
-                disabled={participantsLocked}
-              />
-              {uq && !participantsLocked && (
-                <div className="mt-2 rounded border border-black/10 p-2 dark:border-white/10">
-                  {userOptions.length === 0 ? (
-                    <div className="text-sm text-gray-600 dark:text-white/70">Ничего не найдено</div>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      {userOptions.map((u) => (
-                        <div key={u.id} className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium">{u.fullName}</div>
-                            <div className="text-sm text-gray-600 dark:text-white/70">{u.email}</div>
+              <div>
+                <Input
+                  label="Добавить участника"
+                  placeholder="Поиск по ФИО или email"
+                  value={uq}
+                  onChange={(e) => setUq(e.target.value)}
+                  disabled={participantsLocked}
+                />
+                {uq && !participantsLocked && (
+                  <div className="mt-2 rounded border border-black/10 p-2 dark:border-white/10">
+                    {userOptions.length === 0 ? (
+                      <div className="text-sm text-gray-600 dark:text-white/70">Ничего не найдено</div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {userOptions.map((u) => (
+                          <div key={u.id} className="flex items-center justify-between">
+                            <div>
+                              <div className="font-medium">{u.fullName}</div>
+                              <div className="text-sm text-gray-600 dark:text-white/70">{u.email}</div>
+                            </div>
+                            <button
+                              onClick={() => addParticipant(u.id)}
+                              disabled={isParticipant(u.id) || participantsLocked}
+                              className="rounded bg-sky-600 px-3 py-1 text-sm text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {isParticipant(u.id) ? 'Уже добавлен' : 'Добавить'}
+                            </button>
                           </div>
-                          <button
-                            onClick={() => addParticipant(u.id)}
-                            disabled={isParticipant(u.id) || participantsLocked}
-                            className="rounded bg-sky-600 px-3 py-1 text-sm text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {isParticipant(u.id) ? 'Уже добавлен' : 'Добавить'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <div className="text-sm font-medium">Текущие участники</div>
-              <div className="mt-2 flex flex-col gap-2">
-                {participants.length === 0 ? (
-                  <div className="text-sm text-gray-600 dark:text-white/70">Пока нет участников</div>
-                ) : (
-                  participants.map((p) => (
-                    <div key={p.user.id} className="flex items-center justify-between rounded border border-black/10 p-2 dark:border-white/10">
-                      <div>
-                        <div className="font-medium">{p.user.fullName}</div>
-                        <div className="text-sm text-gray-600 dark:text-white/70">{p.user.email}</div>
+                        ))}
                       </div>
-                      <button
-                        onClick={() => removeParticipant(p.user.id)}
-                        aria-label="Удалить участника"
-                        className="p-1 text-rose-600 hover:text-rose-500 dark:text-rose-400 dark:hover:text-rose-300 rounded focus:outline-none focus:ring-2 focus:ring-rose-400/40"
-                        title="Удалить участника"
-                        disabled={participantsLocked}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="3 6 5 6 21 6" />
-                          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                          <path d="M10 11v6" />
-                          <path d="M14 11v6" />
-                          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))
+                    )}
+                  </div>
                 )}
               </div>
-            </div>
+              <div>
+                <div className="text-sm font-medium">Текущие участники</div>
+                <div className="mt-2 flex flex-col gap-2">
+                  {participants.length === 0 ? (
+                    <div className="text-sm text-gray-600 dark:text-white/70">Пока нет участников</div>
+                  ) : (
+                    participants.map((p) => (
+                      <div key={p.user.id} className="flex items-center justify-between rounded border border-black/10 p-2 dark:border-white/10">
+                        <div>
+                          <div className="font-medium">{p.user.fullName}</div>
+                          <div className="text-sm text-gray-600 dark:text-white/70">{p.user.email}</div>
+                        </div>
+                        <button
+                          onClick={() => removeParticipant(p.user.id)}
+                          aria-label="Удалить участника"
+                          className="p-1 text-rose-600 hover:text-rose-500 dark:text-rose-400 dark:hover:text-rose-300 rounded focus:outline-none focus:ring-2 focus:ring-rose-400/40"
+                          title="Удалить участника"
+                          disabled={participantsLocked}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                            <path d="M10 11v6" />
+                            <path d="M14 11v6" />
+                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </Card>
@@ -768,5 +756,3 @@ export default function CourseDetailPage() {
     </div>
   );
 }
-
-

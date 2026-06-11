@@ -14,7 +14,6 @@ export default function RegisterPage() {
   const [birthDate, setBirthDate] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [registrationCode, setRegistrationCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
@@ -25,7 +24,7 @@ export default function RegisterPage() {
     setError(null);
     setOk(null);
     try {
-      await api.post('/auth/register', { fullName, position, birthDate, email, password, registrationCode });
+      await api.post('/auth/register', { fullName, position, birthDate, email, password });
       setOk('Заявка создана. Ожидайте подтверждения администратора.');
       push({ type: 'success', title: 'Заявка отправлена' });
       setTimeout(() => navigate('/login'), 1500);
@@ -60,8 +59,7 @@ export default function RegisterPage() {
             <Input label="Дата рождения" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} type="date" required />
             <Input label="Email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required className="md:col-span-2" />
             <Input label="Пароль" value={password} onChange={(e) => setPassword(e.target.value)} type="password" withPasswordToggle required className="md:col-span-2" />
-            <Input label="Код регистрации" value={registrationCode} onChange={(e) => setRegistrationCode(e.target.value)} inputMode="numeric" pattern="[0-9]*" required className="md:col-span-2" />
-            {error && <div className="md:col-span-2 text-sm text-rose-400">{error}</div>}
+{error && <div className="md:col-span-2 text-sm text-rose-400">{error}</div>}
             {ok && <div className="md:col-span-2 text-sm text-green-300">{ok}</div>}
             <div className="md:col-span-2">
               <Button type="submit" className="w-full">Отправить заявку</Button>
@@ -78,5 +76,8 @@ export default function RegisterPage() {
     </div>
   );
 }
+
+
+
 
 

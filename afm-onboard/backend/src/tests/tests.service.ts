@@ -540,18 +540,37 @@ export class TestsService {
 
     // Обновление прогресса: если тест у урока — отмечаем урок как завершён (на случай без видео);
     // если тест у главы — отмечаем главу COMPLETED
-    if (status === 'PASSED' && testFull) {
+    if (testFull) {
       if (testFull.lesson) {
-        await this.prisma.lessonProgress.upsert({
-          where: { userId_lessonId: { userId: attempt.userId, lessonId: testFull.lesson.id } },
-          update: { completed: true, completedAt: new Date() },
-          create: { userId: attempt.userId, lessonId: testFull.lesson.id, videoProgress: {}, completed: true, completedAt: new Date() },
+        if (status === 'PASSED') {
+          await this.prisma.lessonProgress.upsert({
+            where: { userId_lessonId: { userId: attempt.userId, lessonId: testFull.lesson.id } },
+            update: { completed: true, completedAt: new Date() },
+            create: { userId: attempt.userId, lessonId: testFull.lesson.id, videoProgress: {}, completed: true, completedAt: new Date() },
+          });
+        }
+        // always save lesson test score to chapter progress
+        const chapterId = testFull.lesson.chapterId;
+        const existing = await this.prisma.userProgress.findUnique({
+          where: { userId_chapterId: { userId: attempt.userId, chapterId } },
+          select: { bestScore: true, status: true },
+        });
+        const newBest = Math.max(score, existing?.bestScore ?? 0);
+        await this.prisma.userProgress.upsert({
+          where: { userId_chapterId: { userId: attempt.userId, chapterId } },
+          update: { bestScore: newBest },
+          create: { userId: attempt.userId, chapterId, status: 'AVAILABLE', bestScore: newBest },
         });
       } else if (testFull.chapter) {
+        const existing = await this.prisma.userProgress.findUnique({
+          where: { userId_chapterId: { userId: attempt.userId, chapterId: testFull.chapter.id } },
+          select: { bestScore: true },
+        });
+        const newBest = Math.max(score, existing?.bestScore ?? 0);
         await this.prisma.userProgress.upsert({
           where: { userId_chapterId: { userId: attempt.userId, chapterId: testFull.chapter.id } },
-          update: { status: 'COMPLETED', bestScore: { set: score } },
-          create: { userId: attempt.userId, chapterId: testFull.chapter.id, status: 'COMPLETED', bestScore: score },
+          update: { bestScore: newBest, ...(status === 'PASSED' ? { status: 'COMPLETED' } : {}) },
+          create: { userId: attempt.userId, chapterId: testFull.chapter.id, status: status === 'PASSED' ? 'COMPLETED' : 'AVAILABLE', bestScore: newBest },
         });
       }
     }

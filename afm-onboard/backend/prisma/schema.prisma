@@ -149,9 +149,10 @@ model Lesson {
   createdAt   DateTime @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 
-  contents   LessonContent[]
-  progresses LessonProgress[]
-  test       Test?
+  contents        LessonContent[]
+  progresses      LessonProgress[]
+  test            Test?
+  situationTask   SituationTask?
 
   @@unique([chapterId, orderIndex])
 }
@@ -358,4 +359,34 @@ model UserCourseAccess {
 
   @@unique([userId, courseId])
   @@index([courseId])
+}
+
+model SituationTask {
+  id        String             @id @default(uuid()) @db.Uuid
+  lessonId  String             @unique @db.Uuid
+  lesson    Lesson             @relation(fields: [lessonId], references: [id])
+  title     String             @default('Ситуационная задача')
+  scenario  String             @default('')
+  passScore Int                @default(70)
+  createdAt DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime           @default(now()) @updatedAt @db.Timestamptz(6)
+  questions SituationQuestion[]
+}
+
+model SituationQuestion {
+  id        String           @id @default(uuid()) @db.Uuid
+  taskId    String           @db.Uuid
+  task      SituationTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  text      String
+  sortIndex Int              @default(0)
+  options   SituationOption[]
+}
+
+model SituationOption {
+  id         String            @id @default(uuid()) @db.Uuid
+  questionId String            @db.Uuid
+  question   SituationQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text       String
+  isCorrect  Boolean           @default(false)
+  sortIndex  Int               @default(0)
 }

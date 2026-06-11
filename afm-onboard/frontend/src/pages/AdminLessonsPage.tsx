@@ -89,6 +89,7 @@ export default function AdminLessonsPage() {
                     <Button size="sm" variant="secondary" onClick={() => setEditing(l)}>Редактировать</Button>
                     <Button size="sm" variant="ghost" onClick={() => navigate(`/admin/chapters/${chapterId}/lessons/${l.id}`)}>Контент урока</Button>
                     <Button size="sm" variant="ghost" onClick={() => navigate(`/admin/lessons/${l.id}/test`)}>Тест урока</Button>
+                    <Button size="sm" variant="ghost" onClick={() => navigate(`/admin/lessons/${l.id}/situation`)}>Ситуационная задача</Button>
                     <Button size="sm" variant="danger" onClick={() => remove(l.id)}>Удалить</Button>
                   </div>
                 </div>
