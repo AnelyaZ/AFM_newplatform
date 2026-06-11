@@ -19,6 +19,9 @@ type Profile = {
     role: 'ADMIN' | 'EMPLOYEE';
     status: 'PENDING' | 'APPROVED' | 'REJECTED';
     avatarKey?: string | null;
+    university?: string | null;
+    major?: string | null;
+    createdAt: string;
   };
   stats: { completedChapters: number; averageScore: number };
   courses: { id: string; title: string; description?: string | null }[];
@@ -117,8 +120,20 @@ export default function AdminUserProfilePage() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Input label="ФИО" value={data.user.fullName} readOnly />
                 <Input label="Email" value={data.user.email} readOnly />
-                <Input label="Должность" value={data.user.position} readOnly />
+                <Input label="Должность" value={data.user.position || '—'} readOnly />
                 <Input label="Статус" value={data.user.status} readOnly />
+                <Input label="Университет" value={data.user.university || '—'} readOnly />
+                <Input label="Специальность / Факультет" value={data.user.major || '—'} readOnly />
+                <Input
+                  label="Дата рождения"
+                  value={data.user.birthDate ? new Date(data.user.birthDate).toLocaleDateString('ru') : '—'}
+                  readOnly
+                />
+                <Input
+                  label="Дата добавления"
+                  value={data.user.createdAt ? new Date(data.user.createdAt).toLocaleDateString('ru', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}
+                  readOnly
+                />
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <Card title="Завершено модулей">

@@ -54,7 +54,7 @@ export class UsersController {
 
   // Обновление профиля сотрудника администратором (аватар и основные поля)
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: { fullName?: string; position?: string; birthDate?: string; email?: string; avatarKey?: string }) {
+  update(@Param('id') id: string, @Body() body: { fullName?: string; position?: string; birthDate?: string; email?: string; avatarKey?: string; university?: string; major?: string }) {
     return this.users.adminUpdateUser(id, body);
   }
 }

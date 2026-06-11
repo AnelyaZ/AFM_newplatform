@@ -12,6 +12,8 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
   const [position, setPosition] = useState('');
   const [birthDate, setBirthDate] = useState('');
+  const [university, setUniversity] = useState('');
+  const [major, setMajor] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export default function RegisterPage() {
     setError(null);
     setOk(null);
     try {
-      await api.post('/auth/register', { fullName, position, birthDate, email, password });
+      await api.post('/auth/register', { fullName, position, birthDate, university, major, email, password });
       setOk('Заявка создана. Ожидайте подтверждения администратора.');
       push({ type: 'success', title: 'Заявка отправлена' });
       setTimeout(() => navigate('/login'), 1500);
@@ -57,6 +59,8 @@ export default function RegisterPage() {
             <Input label="ФИО" value={fullName} onChange={(e) => setFullName(e.target.value)} required className="md:col-span-2" />
             <Input label="Должность" value={position} onChange={(e) => setPosition(e.target.value)} required />
             <Input label="Дата рождения" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} type="date" required />
+            <Input label="Университет" value={university} onChange={(e) => setUniversity(e.target.value)} placeholder="Например: НУ, КазНУ, ЕНУ…" />
+            <Input label="Специальность / Факультет" value={major} onChange={(e) => setMajor(e.target.value)} placeholder="Например: Юриспруденция, Финансы…" />
             <Input label="Email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required className="md:col-span-2" />
             <Input label="Пароль" value={password} onChange={(e) => setPassword(e.target.value)} type="password" withPasswordToggle required className="md:col-span-2" />
 {error && <div className="md:col-span-2 text-sm text-rose-400">{error}</div>}

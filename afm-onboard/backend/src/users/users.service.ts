@@ -196,6 +196,8 @@ export class UsersService {
         role: true,
         status: true,
         avatarKey: true,
+        university: true,
+        major: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -204,7 +206,7 @@ export class UsersService {
 
   async updateSelfProfile(
     userId: string,
-    data: { fullName?: string; position?: string; birthDate?: string; email?: string },
+    data: { fullName?: string; position?: string; birthDate?: string; email?: string; university?: string; major?: string },
   ) {
     return this.prisma.user.update({
       where: { id: userId },
@@ -213,6 +215,8 @@ export class UsersService {
         ...(data.position ? { position: data.position } : {}),
         ...(data.birthDate ? { birthDate: new Date(data.birthDate) } : {}),
         ...(data.email ? { email: data.email } : {}),
+        ...(data.university !== undefined ? { university: data.university } : {}),
+        ...(data.major !== undefined ? { major: data.major } : {}),
       },
       select: {
         id: true,
@@ -222,6 +226,8 @@ export class UsersService {
         email: true,
         role: true,
         status: true,
+        university: true,
+        major: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -252,6 +258,8 @@ export class UsersService {
         role: true,
         status: true,
         avatarKey: true,
+        university: true,
+        major: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -291,7 +299,7 @@ export class UsersService {
   // ADMIN: обновить профиль пользователя (включая аватар)
   async adminUpdateUser(
     id: string,
-    data: { fullName?: string; position?: string; birthDate?: string; email?: string; avatarKey?: string },
+    data: { fullName?: string; position?: string; birthDate?: string; email?: string; avatarKey?: string; university?: string; major?: string },
   ) {
     return this.prisma.user.update({
       where: { id },
@@ -301,6 +309,8 @@ export class UsersService {
         ...(data.birthDate ? { birthDate: new Date(data.birthDate) } : {}),
         ...(data.email ? { email: data.email } : {}),
         ...(data.avatarKey !== undefined ? { avatarKey: data.avatarKey } : {}),
+        ...(data.university !== undefined ? { university: data.university } : {}),
+        ...(data.major !== undefined ? { major: data.major } : {}),
       },
       select: {
         id: true,
@@ -311,6 +321,8 @@ export class UsersService {
         role: true,
         status: true,
         avatarKey: true,
+        university: true,
+        major: true,
         createdAt: true,
         updatedAt: true,
       },

@@ -14,6 +14,8 @@ interface RegisterDto {
   birthDate: string; // ISO date
   email: string;
   password: string;
+  university?: string;
+  major?: string;
   registrationCode?: string;
 }
 
@@ -49,6 +51,8 @@ const passwordHash = await bcrypt.hash(
         email: data.email,
         passwordHash,
         mustChangePassword: false,
+        ...(data.university ? { university: data.university } : {}),
+        ...(data.major ? { major: data.major } : {}),
       },
       select: { id: true, status: true },
     });
@@ -153,7 +157,7 @@ const passwordHash = await bcrypt.hash(
           auth: { user: this.config.get('SMTP_USER'), pass: this.config.get('SMTP_PASS') },
         });
         await transporter.sendMail({
-          from: `"АФМ Обучение" <${this.config.get('SMTP_USER')}>`,
+          from: `"${this.config.get('SMTP_FROM_NAME') || 'АФМ Обучение'}" <${this.config.get('SMTP_USER')}>`,
           to: email,
           subject: 'Сброс пароля — АФМ',
           html: `
