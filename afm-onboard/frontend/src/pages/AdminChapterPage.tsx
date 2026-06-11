@@ -387,7 +387,7 @@ export default function AdminChapterPage() {
 	const [dragOverPosition, setDragOverPosition] = useState<'before'|'after'|null>(null);
 	const prevOpenRef = useRef<Record<string, boolean> | null>(null);
 	const [isOrderingLessons, setIsOrderingLessons] = useState<boolean>(false);
-	const [activeTab, setActiveTab] = useState<Record<string, 'content' | 'test'>>({});
+	const [activeTab, setActiveTab] = useState<Record<string, 'content' | 'test' | 'situation'>>({});
   const [testLoaded, setTestLoaded] = useState<Record<string, boolean>>({});
   const [testConfig, setTestConfig] = useState<Record<string, { passScore?: number | null; timeLimitSec?: number | null; questionCount?: number | null; shuffleQuestions?: boolean; shuffleAnswers?: boolean; isPublished?: boolean }>>({});
 	const [lessonSettingsOpen, setLessonSettingsOpen] = useState<Record<string, boolean>>({});
@@ -699,7 +699,7 @@ export default function AdminChapterPage() {
 		}
 	};
 
-	const setActiveTabFor = async (lessonId: string, tab: 'content'|'test') => {
+	const setActiveTabFor = async (lessonId: string, tab: 'content'|'test'|'situation') => {
 		setActiveTab((m) => ({ ...m, [lessonId]: tab }));
 		if (tab === 'test') await ensureLessonTestLoaded(lessonId);
 	};
@@ -925,13 +925,30 @@ export default function AdminChapterPage() {
                         }`}
 						onClick={() => setActiveTabFor(l.id, 'test')}
 					  >Тест</button>
+					  <button
+                        className={`relative rounded-t-xl border border-black/10 px-3 py-1.5 text-xs font-semibold transition-all dark:border-white/10 ${
+                          (activeTab[l.id] || 'content') === 'situation'
+                            ? 'z-20 bg-white dark:bg-slate-800 text-gray-800 dark:text-white border-b-0 translate-y-0 shadow-none'
+                            : 'z-0 bg-gray-100 text-gray-700 hover:bg-white dark:bg-white/10 dark:text-gray-200 dark:hover:bg-white/20 backdrop-blur-sm translate-y-[1px] shadow-sm'
+                        }`}
+						onClick={() => setActiveTabFor(l.id, 'situation')}
+					  >Ситуация</button>
 					</div>
                     <div
                       className="relative z-10 -mt-[1px] rounded-xl border border-black/10 bg-white pt-5 shadow-sm dark:border-white/10 dark:bg-slate-800 before:absolute before:inset-x-0 before:top-0 before:h-2 before:bg-transparent"
                       onKeyDown={handleHotkeysFor(l.id)}
                       tabIndex={0}
                     >
-                      {(activeTab[l.id] || 'content') === 'content' ? (
+                      {(activeTab[l.id] || 'content') === 'situation' ? (
+                        <div className="px-3 sm:px-4 py-3">
+                          <Button onClick={() => navigate(`/admin/lessons/${l.id}/situation`)}>
+                            Открыть редактор ситуационной задачи
+                          </Button>
+                          <p className="mt-2 text-sm text-gray-600 dark:text-white/60">
+                            Создайте сценарий и вопросы для ситуационной задачи этого урока.
+                          </p>
+                        </div>
+                      ) : (activeTab[l.id] || 'content') === 'content' ? (
                         <div>
                           <div className="mb-2 text-sm font-medium pl-3 sm:pl-4">Контент урока</div>
                           <div className="space-y-4 transition-all px-3 sm:px-4 py-3">
