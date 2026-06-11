@@ -33,6 +33,7 @@ import CourseLearnPage from './pages/CourseLearnPage';
 import AdminChapterPage from './pages/AdminChapterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import AiChatWidget from './components/AiChatWidget';
 
 function PrivateRoute({ children }: { children: React.ReactElement }) {
   const user = useAuthStore((s) => s.user);
@@ -79,6 +80,7 @@ if (!access && user?.id && refresh) {
   return (
     <BrowserRouter>
       <ToastProvider>
+        <AiChatWidget />
         <Routes>
           <Route
             path="/first-login"

@@ -15,6 +15,7 @@ import { ReportsModule } from './reports/reports.module';
 import { SettingsModule } from './settings/settings.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { SituationsModule } from './situations/situations.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { SituationsModule } from './situations/situations.module';
     CoursesModule,
     UploadsModule,
     SituationsModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [
