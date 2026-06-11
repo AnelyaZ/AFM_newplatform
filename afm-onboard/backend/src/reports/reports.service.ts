@@ -18,7 +18,7 @@ export class ReportsService {
       if (toDate) whereAttempt.startedAt.lte = toDate;
     }
 
-    const [totalUsers, approvedUsers, pendingUsers, rejectedUsers, attemptsAll, attemptsPassed, attemptsFailed, avgScore, chapters] = await Promise.all([
+    const [totalUsers, approvedUsers, pendingUsers, rejectedUsers, attemptsAll, attemptsPassed, attemptsFailed, avgScore] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.user.count({ where: { status: 'APPROVED' } }),
       this.prisma.user.count({ where: { status: 'PENDING' } }),
@@ -27,10 +27,8 @@ export class ReportsService {
       this.prisma.testAttempt.count({ where: { ...whereAttempt, status: 'PASSED' } }),
       this.prisma.testAttempt.count({ where: { ...whereAttempt, status: 'FAILED' } }),
       this.prisma.testAttempt.aggregate({ _avg: { score: true }, where: { ...whereAttempt, finishedAt: { not: null } } }),
-      this.prisma.chapter.findMany({ select: { id: true, orderIndex: true, title: true } }),
     ]);
 
-    // Безопасный запрос с параметризацией через Prisma.sql
     let perChapter: any[];
     if (fromDate || toDate) {
       const safeFromDate = fromDate ?? new Date('1970-01-01');
@@ -63,14 +61,40 @@ export class ReportsService {
 
     const passRate = attemptsAll > 0 ? Math.round((attemptsPassed / attemptsAll) * 100) : 0;
 
+    return {
+      users: {
+        total: totalUsers,
+        approved: approvedUsers,
+        pending: pendingUsers,
+        rejected: rejectedUsers,
+      },
+      attempts: {
+        total: attemptsAll,
+        passed: attemptsPassed,
+        failed: attemptsFailed,
+        passRate,
+        avgScore: Math.round(avgScore._avg.score ?? 0),
+      },
+      perChapter: perChapter.map((r) => ({
+        chapterId: r.id,
+        orderIndex: Number(r.orderIndex),
+        title: r.title as string,
+        attemptsTotal: Number(r.attempts_total ?? 0),
+        attemptsPassed: Number(r.attempts_passed ?? 0),
+        avgScore: Number(r.avg_score ?? 0),
+      })),
+    };
+  }
+
   async getStudents() {
     const users = await this.prisma.user.findMany({
       where: { status: 'APPROVED', role: 'EMPLOYEE' },
       select: {
         id: true, fullName: true, email: true, position: true, createdAt: true,
         attempts: {
-          select: { status: true, score: true, startedAt: true, finishedAt: true,
-            test: { select: { chapter: { select: { title: true, orderIndex: true } } } }
+          select: {
+            status: true, score: true, startedAt: true, finishedAt: true,
+            test: { select: { chapter: { select: { title: true, orderIndex: true } } } },
           },
           orderBy: { startedAt: 'desc' },
         },
@@ -100,31 +124,4 @@ export class ReportsService {
       };
     });
   }
-
-    return {
-      users: {
-        total: totalUsers,
-        approved: approvedUsers,
-        pending: pendingUsers,
-        rejected: rejectedUsers,
-      },
-      attempts: {
-        total: attemptsAll,
-        passed: attemptsPassed,
-        failed: attemptsFailed,
-        passRate,
-        avgScore: Math.round(avgScore._avg.score ?? 0),
-      },
-      perChapter: perChapter.map((r) => ({
-        chapterId: r.id,
-        orderIndex: Number(r.orderIndex),
-        title: r.title as string,
-        attemptsTotal: Number(r.attempts_total ?? 0),
-        attemptsPassed: Number(r.attempts_passed ?? 0),
-        avgScore: Number(r.avg_score ?? 0),
-      })),
-    };
-  }
 }
-
-
