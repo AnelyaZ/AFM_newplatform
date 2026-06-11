@@ -67,7 +67,10 @@ export default function LoginPage() {
               Войти
             </Button>
           </form>
-          <p className="mt-4 text-center text-sm text-gray-600 text-white/70">
+          <p className="mt-4 text-center text-sm text-white/70">
+            <Link className="text-sky-300 underline hover:text-sky-200" to="/forgot-password">Забыли пароль?</Link>
+          </p>
+          <p className="mt-2 text-center text-sm text-gray-600 text-white/70">
             Нет аккаунта? <Link className="text-sky-300 underline hover:text-sky-200" to="/register">Регистрация</Link>
           </p>
         </div>

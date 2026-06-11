@@ -75,8 +75,9 @@ model User {
   auditLogs        AuditLog[]         @relation("AuditActor")
   progress         UserProgress[]
   lessonProgresses LessonProgress[]
-  adminInvites     AdminInvite[]      @relation("AdminInvitedBy")
-  courseAccesses   UserCourseAccess[] @relation("CourseAccessUser")
+  adminInvites       AdminInvite[]        @relation("AdminInvitedBy")
+  courseAccesses     UserCourseAccess[]   @relation("CourseAccessUser")
+  passwordResetTokens PasswordResetToken[]
 }
 
 model AdminInvite {
@@ -358,6 +359,18 @@ model UserCourseAccess {
 
   @@unique([userId, courseId])
   @@index([courseId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id])
+  tokenHash String
+  expiresAt DateTime @db.Timestamptz(6)
+  usedAt    DateTime? @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([userId])
 }
 
 model SituationTask {

@@ -1,7 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
+import * as nodemailer from 'nodemailer';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
 import { SettingsService } from '../settings/settings.service';
@@ -123,6 +125,60 @@ const passwordHash = await bcrypt.hash(
       if (await bcrypt.compare(token, s.refreshTokenHash)) return { id: s.id };
     }
     return null;
+  }
+
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    // Always return success to prevent email enumeration
+    if (!user) return { ok: true };
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.prisma.passwordResetToken.create({
+      data: { id: uuidv4(), userId: user.id, tokenHash, expiresAt },
+    });
+
+    const frontendUrl = this.config.get('FRONTEND_URL') || 'http://localhost:5173';
+    const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
+
+    const smtpHost = this.config.get('SMTP_HOST');
+    if (smtpHost) {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: Number(this.config.get('SMTP_PORT') ?? 465),
+        secure: Number(this.config.get('SMTP_PORT') ?? 465) === 465,
+        auth: { user: this.config.get('SMTP_USER'), pass: this.config.get('SMTP_PASS') },
+      });
+      await transporter.sendMail({
+        from: `"АФМ Обучение" <${this.config.get('SMTP_USER')}>`,
+        to: email,
+        subject: 'Сброс пароля — АФМ',
+        html: `
+          <p>Здравствуйте, ${user.fullName}!</p>
+          <p>Вы запросили сброс пароля. Перейдите по ссылке ниже — она действительна 1 час:</p>
+          <p><a href="${resetUrl}">${resetUrl}</a></p>
+          <p>Если вы не запрашивали сброс пароля, просто проигнорируйте это письмо.</p>
+        `,
+      });
+    }
+
+    return { ok: true };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const record = await this.prisma.passwordResetToken.findFirst({
+      where: { tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
+    });
+    if (!record) throw new BadRequestException('Ссылка недействительна или устарела');
+
+    const passwordHash = await bcrypt.hash(newPassword, Number(this.config.get('BCRYPT_ROUNDS') ?? 12));
+    await this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash } });
+    await this.prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } });
+
+    return { ok: true };
   }
 
   private parseTtl(ttl: string): number {

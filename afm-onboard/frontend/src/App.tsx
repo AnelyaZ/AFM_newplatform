@@ -31,6 +31,8 @@ import api from './lib/api';
 import AdminUserProfilePage from './pages/AdminUserProfilePage';
 import CourseLearnPage from './pages/CourseLearnPage';
 import AdminChapterPage from './pages/AdminChapterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 function PrivateRoute({ children }: { children: React.ReactElement }) {
   const user = useAuthStore((s) => s.user);
@@ -88,6 +90,8 @@ if (!access && user?.id && refresh) {
           />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           <Route
             path="/admin/users"

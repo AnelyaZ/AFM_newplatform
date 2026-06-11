@@ -35,6 +35,20 @@ export class AuthController {
   async logout(@Body() body: LogoutDto) {
     await this.auth.logout(body.userId, body.refreshToken);
   }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async forgotPassword(@Body() body: { email: string }) {
+    return this.auth.forgotPassword(body.email);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async resetPassword(@Body() body: { token: string; password: string }) {
+    return this.auth.resetPassword(body.token, body.password);
+  }
 }
 
 
