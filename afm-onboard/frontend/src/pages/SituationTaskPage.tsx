@@ -31,6 +31,10 @@ export default function SituationTaskPage() {
       try {
         setLoading(true);
         const { data } = await api.get(`/lessons/${lessonId}/situation`);
+        if (data) {
+          data.questions = data.questions ?? [];
+          data.questions.forEach((q: any) => { q.options = q.options ?? []; });
+        }
         setTask(data);
       } catch {
         setTask(null);
@@ -47,20 +51,20 @@ export default function SituationTaskPage() {
   const handleSubmit = () => {
     if (!task) return;
     let correct = 0;
-    for (const q of task.questions) {
+    for (const q of (task.questions ?? [])) {
       const chosen = answers[q.id];
       const correctOpt = q.options.find((o) => o.isCorrect);
       if (chosen && correctOpt && chosen === correctOpt.id) correct++;
     }
-    const percent = Math.round((correct / task.questions.length) * 100);
+    const percent = task.questions.length > 0 ? Math.round((correct / task.questions.length) * 100) : 0;
     setScore(percent);
     setCompleted(true);
     const passed = percent >= (task.passScore ?? 70);
     push({ type: passed ? 'success' : 'error', title: passed ? 'Зачёт' : 'Незачёт', description: `Результат: ${percent}%` });
   };
 
-  const unanswered = task ? task.questions.filter((q) => !answers[q.id]).length : 0;
-  const current = task?.questions[currentIndex];
+  const unanswered = task ? (task.questions ?? []).filter((q) => !answers[q.id]).length : 0;
+  const current = task?.questions?.[currentIndex];
 
   if (loading) return <div className="min-h-[60vh] flex items-center justify-center text-gray-900 dark:text-white">Загрузка…</div>;
 
@@ -99,14 +103,14 @@ export default function SituationTaskPage() {
               <div>
                 <div className="text-xl font-semibold">Ситуационная задача</div>
                 <div className="text-white/90 text-sm">
-                  Вопрос {currentIndex + 1} из {task.questions.length} • Осталось без ответа: {unanswered}
+                  Вопрос {currentIndex + 1} из {task.questions?.length ?? 0} • Осталось без ответа: {unanswered}
                 </div>
               </div>
             </div>
             <div className="mt-3 w-full bg-white/30 rounded-full h-2">
               <div
                 className="bg-white h-2 rounded-full"
-                style={{ width: `${((currentIndex + 1) / Math.max(task.questions.length, 1)) * 100}%`, opacity: 0.9 }}
+                style={{ width: `${((currentIndex + 1) / Math.max(task.questions?.length ?? 1, 1)) * 100}%`, opacity: 0.9 }}
               />
             </div>
           </div>
@@ -154,7 +158,7 @@ export default function SituationTaskPage() {
                 >
                   Назад
                 </Button>
-                {currentIndex < task.questions.length - 1 ? (
+                {currentIndex < (task.questions?.length ?? 1) - 1 ? (
                   <Button onClick={() => setCurrentIndex((i) => i + 1)}>Далее</Button>
                 ) : (
                   <Button onClick={handleSubmit}>Завершить</Button>
@@ -170,7 +174,7 @@ export default function SituationTaskPage() {
             <Card>
               <div className="text-sm font-semibold mb-3 text-gray-900 dark:text-white">Навигация по вопросам</div>
               <div className="flex flex-wrap gap-2">
-                {task.questions.map((q, i) => (
+                {(task.questions ?? []).map((q, i) => (
                   <button
                     key={q.id}
                     onClick={() => setCurrentIndex(i)}
