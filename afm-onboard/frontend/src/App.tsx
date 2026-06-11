@@ -17,7 +17,7 @@ import AdminLessonsPage from './pages/AdminLessonsPage';
 import AdminLessonContentPage from './pages/AdminLessonContentPage';
 import AdminTestBuilderPage from './pages/AdminTestBuilderPage';
 import AdminLessonTestBuilderPage from './pages/AdminLessonTestBuilderPage';
-import AdminSituationBuilderPage from './pages/AdminSituationBuilderPage';
+import AdminSituationBuilderPage from './pages/SituationBuilderPage';
 import AdminCourseTestBuilderPage from './pages/AdminCourseTestBuilderPage';
 import LessonPage from './pages/LessonPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
