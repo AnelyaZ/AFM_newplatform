@@ -17,6 +17,11 @@ export class ReportsController {
   ) {
     return this.reports.getOverview({ from, to });
   }
+
+  @Get('students')
+  students() {
+    return this.reports.getStudents();
+  }
 }
 
 

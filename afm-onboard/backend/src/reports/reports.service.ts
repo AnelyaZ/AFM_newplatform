@@ -63,6 +63,44 @@ export class ReportsService {
 
     const passRate = attemptsAll > 0 ? Math.round((attemptsPassed / attemptsAll) * 100) : 0;
 
+  async getStudents() {
+    const users = await this.prisma.user.findMany({
+      where: { status: 'APPROVED', role: 'EMPLOYEE' },
+      select: {
+        id: true, fullName: true, email: true, position: true, createdAt: true,
+        attempts: {
+          select: { status: true, score: true, startedAt: true, finishedAt: true,
+            test: { select: { chapter: { select: { title: true, orderIndex: true } } } }
+          },
+          orderBy: { startedAt: 'desc' },
+        },
+        lessonProgresses: { select: { completed: true } },
+      },
+      orderBy: { fullName: 'asc' },
+    });
+
+    return users.map((u) => {
+      const total = u.attempts.length;
+      const passed = u.attempts.filter((a) => a.status === 'PASSED').length;
+      const scores = u.attempts.filter((a) => a.score !== null).map((a) => a.score as number);
+      const avgScore = scores.length ? Math.round(scores.reduce((s, v) => s + v, 0) / scores.length) : null;
+      const lastAttempt = u.attempts[0]?.startedAt ?? null;
+      const completedLessons = u.lessonProgresses.filter((p) => p.completed).length;
+      return {
+        id: u.id, fullName: u.fullName, email: u.email, position: u.position,
+        joinedAt: u.createdAt,
+        totalAttempts: total, passedAttempts: passed,
+        passRate: total > 0 ? Math.round((passed / total) * 100) : null,
+        avgScore, lastActivity: lastAttempt, completedLessons,
+        attempts: u.attempts.map((a) => ({
+          status: a.status, score: a.score, startedAt: a.startedAt,
+          chapterTitle: a.test?.chapter?.title ?? null,
+          chapterOrder: a.test?.chapter?.orderIndex ?? null,
+        })),
+      };
+    });
+  }
+
     return {
       users: {
         total: totalUsers,
