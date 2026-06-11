@@ -145,23 +145,30 @@ const passwordHash = await bcrypt.hash(
 
     const smtpHost = this.config.get('SMTP_HOST');
     if (smtpHost) {
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: Number(this.config.get('SMTP_PORT') ?? 465),
-        secure: Number(this.config.get('SMTP_PORT') ?? 465) === 465,
-        auth: { user: this.config.get('SMTP_USER'), pass: this.config.get('SMTP_PASS') },
-      });
-      await transporter.sendMail({
-        from: `"АФМ Обучение" <${this.config.get('SMTP_USER')}>`,
-        to: email,
-        subject: 'Сброс пароля — АФМ',
-        html: `
-          <p>Здравствуйте, ${user.fullName}!</p>
-          <p>Вы запросили сброс пароля. Перейдите по ссылке ниже — она действительна 1 час:</p>
-          <p><a href="${resetUrl}">${resetUrl}</a></p>
-          <p>Если вы не запрашивали сброс пароля, просто проигнорируйте это письмо.</p>
-        `,
-      });
+      try {
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: Number(this.config.get('SMTP_PORT') ?? 465),
+          secure: Number(this.config.get('SMTP_PORT') ?? 465) === 465,
+          auth: { user: this.config.get('SMTP_USER'), pass: this.config.get('SMTP_PASS') },
+        });
+        await transporter.sendMail({
+          from: `"АФМ Обучение" <${this.config.get('SMTP_USER')}>`,
+          to: email,
+          subject: 'Сброс пароля — АФМ',
+          html: `
+            <p>Здравствуйте, ${user.fullName}!</p>
+            <p>Вы запросили сброс пароля. Перейдите по ссылке ниже — она действительна 1 час:</p>
+            <p><a href="${resetUrl}">${resetUrl}</a></p>
+            <p>Если вы не запрашивали сброс пароля, просто проигнорируйте это письмо.</p>
+          `,
+        });
+      } catch (e) {
+        console.error('Failed to send password reset email:', e);
+      }
+    } else {
+      // No SMTP configured — log the reset URL for development
+      console.log(`[DEV] Password reset link for ${email}: ${resetUrl}`);
     }
 
     return { ok: true };
