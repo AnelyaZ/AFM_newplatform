@@ -14,6 +14,7 @@ import { CoursesModule } from './courses/courses.module';
 import { ReportsModule } from './reports/reports.module';
 import { SettingsModule } from './settings/settings.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { SituationsModule } from './situations/situations.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { UploadsModule } from './uploads/uploads.module';
     SettingsModule,
     CoursesModule,
     UploadsModule,
+    SituationsModule,
   ],
   controllers: [AppController],
   providers: [
