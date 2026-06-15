@@ -7,7 +7,7 @@ const backendUrl = process.env.VITE_BACKEND_URL || 'http://localhost:8080'
 export default defineConfig({
   plugins: [react()],
   server: {
-    allowedHosts: ['localhost', '127.0.0.1', 'afm.ngrok.app', 'afmback.ngrok.app'],
+    allowedHosts: 'all',
     proxy: {
       '/api': {
         target: backendUrl,
