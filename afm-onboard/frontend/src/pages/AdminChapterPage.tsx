@@ -1011,7 +1011,7 @@ export default function AdminChapterPage() {
                                           onClick={() => {
                                           const input = document.createElement('input');
                                           input.type = 'file';
-                                          if (b.blockType === 'VIDEO') input.accept = 'video/mp4,video/webm,video/mov,video/*';
+                                          if (b.blockType === 'VIDEO') input.accept = 'video/mp4,video/webm,video/mov,video/avi,video/mkv,video/*';
                                           else if (b.blockType === 'IMAGE') input.accept = 'image/*';
                                           else if (b.blockType === 'FILE') input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt';
                                           input.onchange = async () => {
@@ -1025,8 +1025,9 @@ export default function AdminChapterPage() {
                                               const key = await uploadFileWithProgress(f, setUploadProgress);
                                               setBlocksFor(l.id, (arr) => arr.map((x, i) => i === idx ? { ...x, mediaKey: key } : x));
                                               push({ type: 'success', title: 'Файл загружен' });
-                                            } catch {
-                                              push({ type: 'error', title: 'Ошибка загрузки файла' });
+                                            } catch (err: any) {
+                                              const msg = err?.response?.data?.message || 'Ошибка загрузки файла';
+                                              push({ type: 'error', title: msg });
                                             } finally {
                                               setUploadingKey(null);
                                             }

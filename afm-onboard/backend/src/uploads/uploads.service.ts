@@ -40,19 +40,17 @@ export class UploadsService implements OnModuleInit {
     }
   }
 
-  async upload(
-    file: Express.Multer.File,
-    key: string,
-  ): Promise<string> {
+  async uploadFromDisk(filePath: string, key: string, contentType: string): Promise<string> {
+    const { createReadStream } = await import('fs');
+    const stream = createReadStream(filePath);
     await this.s3.send(
       new PutObjectCommand({
         Bucket: this.bucket,
         Key: key,
-        Body: file.buffer,
-        ContentType: file.mimetype,
+        Body: stream as any,
+        ContentType: contentType,
       }),
     );
-
     return `${this.endpoint}/${this.bucket}/${key}`;
   }
 }

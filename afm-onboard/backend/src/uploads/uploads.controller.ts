@@ -7,15 +7,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
-import { extname } from 'path';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
 import { v4 as uuid } from 'uuid';
 import { AuthGuard } from '@nestjs/passport';
 import { UploadsService } from './uploads.service';
-import { writeFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
+import { mkdirSync, renameSync, unlinkSync } from 'fs';
 
-const MAX_SIZE = 200 * 1024 * 1024; // 200 MB
+const MAX_SIZE = 500 * 1024 * 1024; // 500 MB
+const UPLOADS_DIR = join(process.cwd(), 'uploads');
 
 @Controller('uploads')
 export class UploadsController {
@@ -25,11 +25,20 @@ export class UploadsController {
   @UseGuards(AuthGuard('jwt'))
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: memoryStorage(),
+      storage: diskStorage({
+        destination: (_req, _file, cb) => {
+          mkdirSync(UPLOADS_DIR, { recursive: true });
+          cb(null, UPLOADS_DIR);
+        },
+        filename: (_req, file, cb) => {
+          const ext = extname(file.originalname).toLowerCase();
+          cb(null, `tmp-${uuid()}${ext}`);
+        },
+      }),
       limits: { fileSize: MAX_SIZE },
       fileFilter: (_req, file, cb) => {
         const allowed =
-          /\.(jpg|jpeg|png|gif|webp|svg|mp4|webm|mov|pdf|doc|docx|xls|xlsx|ppt|pptx|zip|txt)$/i;
+          /\.(jpg|jpeg|png|gif|webp|svg|mp4|webm|mov|avi|mkv|pdf|doc|docx|xls|xlsx|ppt|pptx|zip|txt)$/i;
         if (!allowed.test(extname(file.originalname))) {
           return cb(new BadRequestException('Недопустимый тип файла'), false);
         }
@@ -43,21 +52,21 @@ export class UploadsController {
     }
 
     const ext = extname(file.originalname).toLowerCase();
-    const key = `${uuid()}${ext}`;
+    const finalKey = `${uuid()}${ext}`;
+    const tmpPath = file.path;
+    const finalPath = join(UPLOADS_DIR, finalKey);
 
-    // 1. Сохраняем в MinIO (S3)
+    // Rename temp file to final key
+    renameSync(tmpPath, finalPath);
+
+    // Try uploading to MinIO in the background (non-blocking)
     let s3Url: string | null = null;
     try {
-      s3Url = await this.uploadsService.upload(file, key);
+      s3Url = await this.uploadsService.uploadFromDisk(finalPath, finalKey, file.mimetype);
     } catch (e) {
-      console.warn('S3 upload failed, using local storage only:', e.message);
+      console.warn('MinIO upload failed, serving from local disk:', (e as any).message);
     }
 
-    // 2. Сохраняем локально как fallback и для раздачи через /uploads
-    const uploadsDir = join(process.cwd(), 'uploads');
-    mkdirSync(uploadsDir, { recursive: true });
-    writeFileSync(join(uploadsDir, key), file.buffer);
-
-    return { key: `/uploads/${key}`, s3Url };
+    return { key: `/uploads/${finalKey}`, s3Url };
   }
 }
