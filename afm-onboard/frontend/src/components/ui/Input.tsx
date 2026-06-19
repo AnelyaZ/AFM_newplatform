@@ -18,13 +18,13 @@ export default function Input({ label, error, className = '', withPasswordToggle
 
   return (
     <label className="flex flex-col gap-1">
-      {label && <span className="text-sm font-medium text-gray-800 dark:text-white/90">{label}</span>}
+      {label && <span className="text-sm font-medium text-white/90">{label}</span>}
       <div className="relative">
         <input
           type={inputType}
-          className={`w-full rounded-lg border px-3 py-2 pr-10 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white dark:placeholder-white/40 ${
-            error ? 'border-rose-500' : 'border-gray-300 dark:border-white/10'
-          } bg-white dark:bg-white/5 ${className}`}
+          className={`w-full rounded-lg border px-3 py-2 pr-10 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-sky-500 [&:-webkit-autofill]:!bg-white/5 [&:-webkit-autofill]:!text-white [&:-webkit-autofill]:[box-shadow:0_0_0_1000px_rgba(255,255,255,0.05)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white] ${
+            error ? 'border-rose-500' : 'border-white/10'
+          } bg-white/5 ${className}`}
           {...rest}
         />
         {canToggle && (
