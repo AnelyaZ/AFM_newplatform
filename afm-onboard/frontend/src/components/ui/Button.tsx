@@ -22,9 +22,9 @@ export default function Button({
   const base = 'btn-glow inline-flex items-center justify-center rounded-lg font-medium transition-all focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed';
   const variants: Record<string, string> = {
     primary: 'bg-sky-600 hover:bg-sky-500 text-white',
-    secondary: 'bg-gray-100 hover:bg-gray-200 text-gray-900 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white',
+    secondary: 'bg-white/10 hover:bg-white/20 text-white',
     danger: 'bg-rose-600 hover:bg-rose-500 text-white',
-    ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10',
+    ghost: 'bg-transparent text-white hover:bg-white/10',
   };
   const sizes: Record<string, string> = {
     sm: 'h-8 px-3 text-sm',
