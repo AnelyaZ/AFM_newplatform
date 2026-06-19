@@ -118,8 +118,8 @@ export default function SituationTaskPage() {
           {/* Scenario */}
           {task.scenario && (
             <Card>
-              <div className="text-sm font-semibold text-sky-600 dark:text-sky-400 mb-2">Условие задачи</div>
-              <div className="text-gray-800 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">{task.scenario}</div>
+              <div className="text-sm font-semibold text-sky-400 mb-2">Условие задачи</div>
+              <div className="text-white/90 whitespace-pre-wrap leading-relaxed">{task.scenario}</div>
             </Card>
           )}
 
@@ -130,13 +130,13 @@ export default function SituationTaskPage() {
                 <div className="mt-0.5 w-8 h-8 rounded-full bg-gradient-to-br from-sky-500 to-indigo-500 text-white text-sm font-semibold shadow-sm ring-2 ring-sky-300/40 flex items-center justify-center select-none">
                   {currentIndex + 1}
                 </div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{current.text}</h2>
+                <h2 className="text-lg font-semibold text-white">{current.text}</h2>
               </div>
               <div className="space-y-3">
                 {current.options.map((o) => (
                   <label
                     key={o.id}
-                    className="group flex items-center gap-3 p-3 border rounded hover:bg-black/5 cursor-pointer border-black/10 dark:border-white/10 dark:hover:bg-white/10"
+                    className="group flex items-center gap-3 p-3 border rounded hover:bg-white/10 cursor-pointer border-white/10"
                   >
                     <input
                       type="radio"
@@ -145,7 +145,7 @@ export default function SituationTaskPage() {
                       onChange={() => handleSelect(current.id, o.id)}
                       className="afm-check"
                     />
-                    <span className="text-gray-800 dark:text-gray-100">{o.text}</span>
+                    <span className="text-white/90">{o.text}</span>
                   </label>
                 ))}
               </div>
@@ -172,7 +172,7 @@ export default function SituationTaskPage() {
         <div className="hidden lg:block w-48 shrink-0">
           <div className="sticky top-6">
             <Card>
-              <div className="text-sm font-semibold mb-3 text-gray-900 dark:text-white">Навигация по вопросам</div>
+              <div className="text-sm font-semibold mb-3 text-white">Навигация по вопросам</div>
               <div className="flex flex-wrap gap-2">
                 {(task.questions ?? []).map((q, i) => (
                   <button
@@ -183,7 +183,7 @@ export default function SituationTaskPage() {
                         ? 'bg-sky-500 text-white'
                         : answers[q.id]
                         ? 'bg-emerald-500 text-white'
-                        : 'bg-black/10 dark:bg-white/10 text-gray-700 dark:text-white'
+                        : 'bg-white/10 text-white'
                     }`}
                   >
                     {i + 1}
