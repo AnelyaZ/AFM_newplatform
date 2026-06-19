@@ -50,9 +50,9 @@ export default function CourseCard({ course, onOpen, actionsRight, actionsBottom
     >
       <div className="flex-1">
         {description && description.trim() ? (
-          <div className="line-clamp-3 text-sm text-gray-700 dark:text-white/80" title={description || ''}>{description}</div>
+          <div className="line-clamp-3 text-sm text-white/80" title={description || ''}>{description}</div>
         ) : (
-          <div className="text-sm text-gray-600 dark:text-white/70">Описание отсутствует</div>
+          <div className="text-sm text-white/70">Описание отсутствует</div>
         )}
         {typeof progressPercent === 'number' ? (
           <div className="mt-3">
@@ -62,14 +62,14 @@ export default function CourseCard({ course, onOpen, actionsRight, actionsBottom
                 style={{ width: `${Math.max(0, Math.min(100, Number(progressPercent ?? 0)))}%` }}
               />
             </div>
-            <div className="mt-1 text-xs text-gray-600 dark:text-white/70">Прогресс: {Math.max(0, Math.min(100, Number(progressPercent ?? 0)))}%</div>
+            <div className="mt-1 text-xs text-white/70">Прогресс: {Math.max(0, Math.min(100, Number(progressPercent ?? 0)))}%</div>
           </div>
         ) : null}
       </div>
       <div className="mt-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {typeof avgScore === 'number' ? (
-            <span className="rounded bg-black/5 px-2 py-0.5 text-xs text-gray-700 dark:bg-white/10 dark:text-white/80">
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs text-white/80">
               Средняя оценка: {Math.max(0, Math.min(100, Number(avgScore ?? 0)))}%
             </span>
           ) : null}

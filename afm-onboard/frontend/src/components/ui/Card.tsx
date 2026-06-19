@@ -33,7 +33,7 @@ export default function Card({ title, actions, children, className = '', onClick
     >
       {(title || actions) && (
         <div className="flex items-center justify-between border-b border-black/10 px-4 py-3 sm:px-5 sm:py-4 dark:border-white/10">
-          <div className="min-w-0 flex-1 font-semibold text-gray-900 dark:text-white">{title}</div>
+          <div className="min-w-0 flex-1 font-semibold text-white">{title}</div>
           {actions && <div className="ml-3 flex shrink-0 items-center gap-2">{actions}</div>}
         </div>
       )}
